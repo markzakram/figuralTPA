@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generator Soal Bangun Ruang — Jaring-jaring &amp; Pilihan A–E</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <h1>Generator Soal Bangun Ruang</h1>
+    <p class="sub">Pilih bangun &rarr; pilih jaring-jaring &rarr; isi tiap sisi &rarr; soal pilihan A&ndash;E + kunci otomatis</p>
+  </div>
+  <div class="topbar-actions">
+    <button id="btn-help" class="ghost" type="button">Cara pakai</button>
+  </div>
+</header>
+
+<div id="help" class="help" hidden>
+  <ol>
+    <li><b>Pilih bangun ruang.</b> Kubus, balok, prisma segitiga, prisma segienam, limas segiempat, atau limas segitiga. Ukuran balok bisa diubah.</li>
+    <li><b>Pilih jaring-jaring.</b> Semua jaring-jaring yang mungkin dihitung otomatis oleh program &mdash; kubus punya 11, prisma segitiga 9, limas segiempat 8. Untuk kubus dan balok Anda juga bisa menyusun sendiri di papan.</li>
+    <li><b>Isi sisi.</b> Klik sebuah sisi pada gambar jaring-jaring, lalu atur gambar, warna, dan arah putarannya.</li>
+    <li><b>Buat soal.</b> Program mengambil satu orientasi sah sebagai kunci, lalu membuat pengecoh yang dijamin mustahil.</li>
+    <li><b>Simpan.</b> Unduh PNG/SVG, atau kumpulkan di bank soal lalu cetak jadi PDF berikut halaman kunci jawaban.</li>
+  </ol>
+</div>
+
+<main class="layout">
+
+  <!-- ============ KIRI: BANGUN & JARING-JARING ============ -->
+  <section class="panel">
+    <h2><span class="step">1</span> Bangun ruang</h2>
+    <div class="row wrap gap-s" id="solid-picker"></div>
+
+    <div id="param-box" class="params" hidden>
+      <div class="row wrap gap-s" id="params"></div>
+    </div>
+
+    <h2><span class="step">2</span> Jaring-jaring</h2>
+    <div class="row wrap gap-s">
+      <button class="ghost" id="btn-net-random" type="button">Acak jaring</button>
+      <span class="mode-switch" id="mode-switch" hidden>
+        <button class="ghost active" data-mode="auto" type="button" title="Pilih dari daftar jaring-jaring">Daftar</button>
+        <button class="ghost" data-mode="grid" type="button" title="Susun sendiri di papan">Papan</button>
+      </span>
+    </div>
+
+    <div id="gallery-wrap">
+      <p class="hint" id="gallery-note"></p>
+      <div id="gallery" class="gallery"></div>
+    </div>
+
+    <div id="grid-wrap" hidden>
+      <div class="grid-scroll"
+           title="Klik kotak untuk menambah (maksimal 6, harus menempel). Klik kanan untuk menghapus.">
+        <div id="grid" class="grid" oncontextmenu="return false"></div>
+      </div>
+      <p id="fold-status" class="status"></p>
+    </div>
+
+    <h2><span class="step">&#9635;</span> Pratinjau
+      <span class="tip" title="Seret untuk memutar bebas 360° ke segala arah — tarik ke atas, bangunnya ikut berputar ke atas.">?</span>
+    </h2>
+    <div id="preview" class="cube3d"></div>
+    <div class="row gap-s wrap center">
+      <button class="ghost" id="btn-view-reset" type="button">Sudut awal</button>
+      <button class="ghost" id="btn-view-spin" type="button">Putar otomatis</button>
+    </div>
+    <div id="opposite-box" hidden>
+      <h3 id="opposite-title">Pasangan sisi berhadapan</h3>
+      <div id="opposite-list" class="opp-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ TENGAH: JARING BESAR + ISI SISI ============ -->
+  <section class="panel">
+    <div id="net-box">
+      <h2><span class="step">3</span> Klik sisi untuk mengisinya</h2>
+      <div id="net-view" class="net-view"></div>
+    </div>
+
+    <h2><span class="step">4</span> Isi sisi</h2>
+
+    <div id="face-strip" class="face-strip"></div>
+
+    <div id="face-editor">
+      <div class="fe-head">
+        <div id="fe-preview" class="fe-preview"></div>
+        <div>
+          <div id="fe-title" class="fe-title">Sisi</div>
+          <div id="fe-face" class="fe-face"></div>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Jenis gambar</span>
+        <select id="fe-type"></select>
+      </label>
+
+      <div class="field" id="fe-n-wrap" hidden>
+        <span>Mata dadu</span>
+        <div class="row gap-s" id="fe-n"></div>
+      </div>
+
+      <label class="field" id="fe-text-wrap" hidden>
+        <span>Huruf / angka (maks 3 karakter)</span>
+        <input type="text" id="fe-text" maxlength="3">
+      </label>
+
+      <div class="field">
+        <span>Warna gambar</span>
+        <div class="row gap-s wrap" id="fe-fg"></div>
+      </div>
+
+      <div class="field">
+        <span>Warna latar sisi</span>
+        <div class="row gap-s wrap" id="fe-bg"></div>
+      </div>
+
+      <div class="field">
+        <span>Arah gambar</span>
+        <div class="row gap-s">
+          <button class="ghost" id="fe-rot-ccw" type="button" title="Putar berlawanan jarum jam">&#8630;</button>
+          <button class="ghost" id="fe-rot-cw" type="button" title="Putar searah jarum jam">&#8631;</button>
+          <span class="rot-val" id="fe-rot-val">0&deg;</span>
+        </div>
+      </div>
+
+      <button class="ghost" id="btn-copy-bg" type="button">Samakan warna latar semua sisi</button>
+    </div>
+
+    <div class="quick">
+      <button class="ghost" id="btn-dice" type="button">Isi bernomor</button>
+      <button class="ghost" id="btn-random" type="button">Acak isi sisi</button>
+      <button class="ghost" id="btn-clear-art" type="button">Kosongkan isi</button>
+    </div>
+  </section>
+
+  <!-- ============ KANAN: SOAL ============ -->
+  <section class="panel wide">
+    <h2><span class="step">5</span> Soal &amp; pilihan jawaban</h2>
+
+    <div class="row gap-s wrap">
+      <label class="field inline">
+        <span>Tingkat kesulitan</span>
+        <select id="difficulty">
+          <option value="mudah">Mudah &mdash; pengecoh mencolok</option>
+          <option value="sedang" selected>Sedang &mdash; campuran</option>
+          <option value="sulit">Sulit &mdash; beda arah gambar</option>
+        </select>
+      </label>
+      <button class="primary" id="btn-generate" type="button">Buat soal</button>
+      <label class="check">
+        <input type="checkbox" id="show-key">
+        Tampilkan kunci pada gambar
+      </label>
+    </div>
+
+    <div id="quiz-warnings"></div>
+    <div id="quiz-sheet" class="sheet"></div>
+
+    <div id="quiz-answer" class="answer" hidden>
+      <div class="row gap-s wrap center">
+        <span class="ans-label">Jawab:</span>
+        <span id="answer-buttons" class="row gap-s"></span>
+      </div>
+      <p id="answer-feedback" class="feedback"></p>
+      <p id="answer-reveal" class="reveal"></p>
+    </div>
+
+    <div class="row gap-s wrap" id="quiz-actions" hidden>
+      <button class="ghost" id="btn-png" type="button">Unduh PNG</button>
+      <button class="ghost" id="btn-svg" type="button">Unduh SVG</button>
+      <button class="ghost" id="btn-add-bank" type="button">Tambah ke bank soal</button>
+      <button class="ghost" id="btn-add-many" type="button">Tambah 5 soal berbeda</button>
+    </div>
+
+    <h3>Bank soal (<span id="bank-count">0</span>)</h3>
+    <div class="row gap-s wrap">
+      <button class="ghost" id="btn-print" type="button">Cetak / simpan PDF</button>
+      <button class="ghost danger" id="btn-clear-bank" type="button">Kosongkan bank</button>
+    </div>
+    <div id="bank" class="bank"></div>
+  </section>
+
+</main>
+
+<div id="print-area" class="print-area"></div>
+
+<script src="js/geometry.js"></script>
+<script src="js/solids.js"></script>
+<script src="js/art.js"></script>
+<script src="js/render.js"></script>
+<script src="js/quiz.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
