@@ -167,11 +167,11 @@
 
   var CATALOG = {
     kubus: {
-      name: 'Kubus', faceCount: 6, pose: null, projection: 'oblique',
+      name: 'Kubus', short: 'Kubus', faceCount: 6, pose: null, projection: 'oblique',
       build: function () { return boxSolid(1, 1, 1); }
     },
     balok: {
-      name: 'Balok', faceCount: 6, pose: null, projection: 'oblique',
+      name: 'Balok', short: 'Balok', faceCount: 6, pose: null, projection: 'oblique',
       params: { p: 1.35, l: 0.8, t: 1 },
       paramInfo: [
         { key: 'p', label: 'Panjang' }, { key: 'l', label: 'Lebar' }, { key: 't', label: 'Tinggi' }
@@ -183,21 +183,33 @@
     },
     // pose 'auto' = sudut pandang dicari otomatis oleh choosePose()
     prisma3: {
-      name: 'Prisma segitiga', faceCount: 5, pose: 'auto', projection: 'ortho',
+      name: 'Prisma segitiga', short: 'Prisma 3', faceCount: 5, pose: 'auto', projection: 'ortho',
       build: function () { return prismSolid(3, 0.62, 0.95); }
     },
+    prisma5: {
+      name: 'Prisma segilima', short: 'Prisma 5', faceCount: 7, pose: 'auto', projection: 'ortho',
+      build: function () { return prismSolid(5, 0.56, 0.92); }
+    },
     prisma6: {
-      name: 'Prisma segienam', faceCount: 8, pose: 'auto', projection: 'ortho',
+      name: 'Prisma segienam', short: 'Prisma 6', faceCount: 8, pose: 'auto', projection: 'ortho',
       build: function () { return prismSolid(6, 0.52, 0.9); }
     },
     limas4: {
-      name: 'Limas segiempat', faceCount: 5, pose: 'auto', projection: 'ortho',
+      name: 'Limas segiempat', short: 'Limas 4', faceCount: 5, pose: 'auto', projection: 'ortho',
       build: function () { return pyramidSolid(4, 0.72, 1.05); }
+    },
+    limas5: {
+      name: 'Limas segilima', short: 'Limas 5', faceCount: 6, pose: 'auto', projection: 'ortho',
+      build: function () { return pyramidSolid(5, 0.66, 1.0); }
+    },
+    limas6: {
+      name: 'Limas segienam', short: 'Limas 6', faceCount: 7, pose: 'auto', projection: 'ortho',
+      build: function () { return pyramidSolid(6, 0.62, 0.98); }
     },
     limas3: {
       // bidang empat beraturan: tinggi = r*akar(2) membuat keempat sisinya kongruen,
       // sehingga grup rotasinya 12 (bukan 3) dan soal jadi jauh lebih bervariasi
-      name: 'Limas segitiga', faceCount: 4, pose: 'auto', projection: 'ortho',
+      name: 'Limas segitiga', short: 'Limas 3', faceCount: 4, pose: 'auto', projection: 'ortho',
       build: function () { return pyramidSolid(3, 0.68, 0.68 * Math.SQRT2); }
     }
   };
@@ -283,7 +295,7 @@
     });
 
     var solid = {
-      id: id, name: def.name, verts: verts, faces: faces,
+      id: id, name: def.name, short: def.short || def.name, verts: verts, faces: faces,
       params: q, paramInfo: def.paramInfo || null,
       pose: def.pose, projection: def.projection
     };
@@ -680,10 +692,79 @@
     return solid.faces.map(function () { return { art: makeArt ? makeArt() : null, rot: 0 }; });
   }
 
+  /**
+   * Sidik bentuk: dua bangun dengan kunci sama itu kongruen (jumlah, bentuk, dan
+   * luas sisinya identik). Dipakai agar balok berukuran 1:1:1 tidak dijadikan
+   * pengecoh untuk soal kubus.
+   */
+  function shapeKey(solid) {
+    return solid.faces.map(function (f) {
+      return f.sides + ':' + Math.round(f.area * 1000);
+    }).sort().join('|');
+  }
+
+  // ---------------------------------------------------------------- bangun datar penyusun
+
+  function edgeLengths(f) {
+    var out = [];
+    for (var i = 0; i < f.poly.length; i++) {
+      out.push(length(sub(f.poly[(i + 1) % f.poly.length], f.poly[i])));
+    }
+    return out;
+  }
+
+  /** Sidik bentuk sebuah sisi, bebas ukuran — persegi dan persegi panjang berbeda. */
+  function faceShapeKey(f) {
+    var ls = edgeLengths(f);
+    var per = ls.reduce(function (a, b) { return a + b; }, 0);
+    return f.sides + ':' + ls.map(function (l) { return Math.round(l / per * 1000); })
+      .sort(function (a, b) { return a - b; }).join(',');
+  }
+
+  function faceShapeLabel(f) {
+    var ls = edgeLengths(f).map(function (l) { return Math.round(l * 1000); });
+    var beda = ls.filter(function (v, i) { return ls.indexOf(v) === i; }).length;
+    if (f.sides === 3) return beda === 1 ? 'segitiga sama sisi' : (beda === 2 ? 'segitiga sama kaki' : 'segitiga');
+    if (f.sides === 4) return beda === 1 ? 'persegi' : 'persegi panjang';
+    return { 5: 'segilima', 6: 'segienam', 7: 'segitujuh', 8: 'segidelapan' }[f.sides] || 'segi-' + f.sides;
+  }
+
+  /** Poligon sebuah sisi dalam koordinat bidangnya sendiri (y ke bawah, siap digambar). */
+  function facePoly2D(f) {
+    return f.poly.map(function (v) {
+      return [dot(sub(v, f.center), f.right), -dot(sub(v, f.center), f.up)];
+    });
+  }
+
+  /** Daftar bangun datar penyusun: bentuk berbeda beserta jumlahnya. */
+  function composition(solid) {
+    var by = {}, order = [];
+    solid.faces.forEach(function (f) {
+      var k = faceShapeKey(f);
+      if (!by[k]) {
+        by[k] = { key: k, label: faceShapeLabel(f), count: 0, poly: facePoly2D(f), sides: f.sides };
+        order.push(k);
+      }
+      by[k].count++;
+    });
+    return order.map(function (k) { return by[k]; })
+      .sort(function (a, b) { return b.count - a.count || a.sides - b.sides; });
+  }
+
+  function compositionKey(solid) {
+    return composition(solid).map(function (c) { return c.count + '×' + c.key; }).sort().join('|');
+  }
+
+  function compositionText(solid) {
+    return composition(solid).map(function (c) { return c.count + ' ' + c.label; }).join(' + ');
+  }
+
   return {
     CATALOG: CATALOG, build: build, nets: nets, unfold: unfold,
     applyRotation: applyRotation, visibleFaces: visibleFaces, poseMatrix: poseMatrix,
-    blankFaces: blankFaces, boundsOf: boundsOf, rotateCells: rotateCells,
+    blankFaces: blankFaces, boundsOf: boundsOf, rotateCells: rotateCells, shapeKey: shapeKey,
+    composition: composition, compositionKey: compositionKey, compositionText: compositionText,
+    faceShapeLabel: faceShapeLabel, facePoly2D: facePoly2D,
     symmetries: symmetries, isSpanningTree: isSpanningTree, treeKey: treeKey,
     anglesToMatrix: anglesToMatrix, choosePose: choosePose, orthonormalize: orthonormalize,
     matVec: matVec, matMul: matMul, det: det, dot: dot, cross: cross, unit: unit,

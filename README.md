@@ -14,6 +14,17 @@ Tidak perlu instalasi, server, atau koneksi internet. Cukup buka **`index.html`*
 dengan peramban (Chrome, Edge, atau Firefox). Seluruh tampilan dirancang muat dalam
 satu layar tanpa perlu digulir (diuji pada 1366×768 dan 1440×960).
 
+## Empat tipe soal
+
+| Tipe | Soal | Pilihan A–E |
+|---|---|---|
+| **A** | jaring-jaring | bangun ruang 3D dengan susunan sisi berbeda |
+| **B** | bangun ruang 3D | jaring-jaring (kebalikan dari tipe A) |
+| **C** | jaring-jaring | bentuk bangun ruang yang berbeda-beda |
+| **D** | bangun ruang 3D | bangun datar penyusunnya, mis. "3 persegi panjang + 2 segitiga" |
+
+Tingkat kesulitan (mudah/sedang/sulit) berlaku untuk tipe A.
+
 ## Bangun ruang yang didukung
 
 | Bangun | Sisi | Orientasi sah | Jaring-jaring |
@@ -21,12 +32,19 @@ satu layar tanpa perlu digulir (diuji pada 1366×768 dan 1440×960).
 | Kubus | 6 | 24 | **11** |
 | Balok (ukuran bisa diatur) | 6 | 4 | 54 |
 | Prisma segitiga | 5 | 6 | **9** |
-| Prisma segienam | 8 | 12 | 60+ |
+| Prisma segilima | 7 | 10 | 99 |
+| Prisma segienam | 8 | 12 | 200+ |
 | Limas segiempat | 5 | 4 | **8** |
+| Limas segilima | 6 | 5 | 15 |
+| Limas segienam | 7 | 6 | 33 |
 | Limas segitiga (bidang empat) | 4 | 12 | **2** |
 
 Angka jaring-jaring yang ditebalkan cocok dengan hasil baku matematika — daftarnya
 **dihitung program**, bukan digambar manual, jadi tidak ada yang terlewat.
+
+Tersedia **32 jenis gambar sisi**: mata dadu 1–6, huruf/angka, wajik, papan catur,
+bingkai, segitiga, panah, bintang, hati, bulan sabit, zigzag, segilima, segienam,
+dan lainnya — masing-masing dengan 9 pilihan warna gambar dan warna latar.
 
 ## Alur pemakaian
 
@@ -36,12 +54,13 @@ Angka jaring-jaring yang ditebalkan cocok dengan hasil baku matematika — dafta
    balok tersedia mode **Papan** untuk menyusun jaring-jaring sendiri (program
    memberi tahu apakah susunan itu benar-benar bisa dilipat).
 3. **Isi sisi.** Klik sebuah sisi pada gambar jaring-jaring (atau pada deretan sisi),
-   lalu atur jenis gambar, warna, dan arah putarannya. *Isi bernomor* mengisi
+   lalu atur jenis gambar, warna, dan arah putarannya. *Isi angka* mengisi
    otomatis — untuk kubus/balok memakai aturan sisi berhadapan berjumlah 7.
 4. **Periksa pratinjau.** Bangun 3D bisa diseret untuk diputar bebas 360° ke segala
    arah (atas, bawah, kiri, kanan) tanpa batas.
-5. **Buat soal.** Pilih tingkat kesulitan lalu tekan *Buat soal*. Tombol A–E di bawah
-   lembar soal bisa diklik untuk mengecek jawaban beserta alasannya.
+5. **Buat soal.** Pilih tipe soal (dan tingkat kesulitan untuk tipe A) lalu tekan
+   *Buat soal*. Tombol A–E di bawah lembar soal bisa diklik untuk mengecek jawaban
+   beserta alasannya.
 6. **Simpan.** Unduh PNG/SVG, atau kumpulkan beberapa soal ke bank soal lalu
    *Cetak / simpan PDF* (halaman terakhir berisi kunci jawaban).
 
@@ -61,9 +80,9 @@ menyusun matriks rotasi/pencerminan lalu menguji apakah seluruh titik sudut kemb
 menempati posisi titik sudut. Hasilnya persis seperti teori: kubus 24 rotasi (48 dengan
 pencerminan), prisma segitiga 6 (12), limas segitiga beraturan 12 (24), dan seterusnya.
 
-**Pilihan jawaban.** Kunci diambil dari salah satu orientasi sah. Setiap calon pengecoh
-dibandingkan terhadap **seluruh** orientasi sah; jika tampilannya cocok dengan salah
-satunya, calon itu dibuang karena sebenarnya benar. Antar pilihan juga tidak boleh
+**Pilihan jawaban (tipe A).** Kunci diambil dari salah satu orientasi sah. Setiap calon
+pengecoh dibandingkan terhadap **seluruh** orientasi sah; jika tampilannya cocok dengan
+salah satunya, calon itu dibuang karena sebenarnya benar. Antar pilihan juga tidak boleh
 kembar. Jenis pengecoh:
 
 | Jenis | Kesalahan yang ditampilkan |
@@ -74,6 +93,17 @@ kembar. Jenis pengecoh:
 | `spin` | arah gambar pada satu sisi diputar keliru |
 
 Tingkat kesulitan hanya mengubah urutan prioritas keempat strategi di atas.
+
+**Pilihan jawaban (tipe B).** Sebuah jaring-jaring dinyatakan benar bila hasil lipatannya
+**dapat diputar** sehingga tampak persis seperti gambar pada soal. Penilaian memakai sisi
+yang terlihat saja — sisi tersembunyi memang tidak bisa dinilai oleh penjawab, jadi
+menyalahkannya tidak adil. Pengecoh dibuat dengan menukar, menggandakan, atau memutar
+gambar antar sisi, lalu diuji: kalau ternyata masih bisa dilipat menjadi gambar soal,
+calon itu dibuang.
+
+**Pilihan jawaban (tipe C & D).** Pengecoh diambil dari bangun ruang lain, tetapi yang
+sidik bentuknya (tipe C) atau susunan bangun datarnya (tipe D) sama dengan kunci akan
+dibuang — misalnya balok berukuran 1:1:1 tidak akan dijadikan pengecoh untuk soal kubus.
 
 **Simetri gambar.** Perbandingan memakai `Art.visualKey()` yang memperhitungkan simetri
 putar tiap gambar: orde 0 (sama dari segala arah — lingkaran, cincin, mata dadu 1),

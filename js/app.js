@@ -118,7 +118,7 @@
     $('solid-picker').innerHTML = Object.keys(Solids.CATALOG).map(function (id) {
       var c = Solids.CATALOG[id];
       return '<button type="button" class="ghost' + (id === state.solidId ? ' active' : '') +
-        '" data-solid="' + id + '">' + c.name + '</button>';
+        '" data-solid="' + id + '" title="' + c.name + '">' + (c.short || c.name) + '</button>';
     }).join('');
 
     var info = Solids.CATALOG[state.solidId].paramInfo;
@@ -283,9 +283,11 @@
     var r = Render.solidSpin(state.solid, state.faces, 134, state.rotM, { strokeWidth: 2 });
     $('preview').innerHTML = Render.doc(r.svg, r.width, r.height);
 
+    // daftar ini hanya informatif untuk bangun seperti kubus/balok/prisma segitiga;
+    // pada prisma segilima ke atas jumlahnya belasan dan malah memenuhi layar
     var pairs = state.solid.untouching;
-    $('opposite-box').hidden = pairs.length === 0;
-    if (pairs.length) {
+    $('opposite-box').hidden = pairs.length === 0 || pairs.length > 4;
+    if (!$('opposite-box').hidden) {
       $('opposite-title').textContent = state.solid.faces.length === 6
         ? 'Pasangan sisi berhadapan' : 'Sisi yang tidak bersentuhan';
       $('opposite-list').innerHTML = pairs.map(function (p) {
@@ -329,21 +331,49 @@
 
   // ---------------------------------------------------------------- lembar soal
 
+  /** Gambar jaring-jaring yang muat dalam kotak lebar x tinggi tertentu. */
+  function netFit(cells, faces, boxW, boxH, sw) {
+    var b = Solids.boundsOf(cells);
+    var scale = Math.min(boxW / b.w, boxH / b.h);
+    return Render.net(cells, faces, scale, { strokeWidth: sw || 2 });
+  }
+
+  /** Gambar pertanyaan (bagian atas lembar), berbeda menurut tipe soal. */
+  function questionRender(quiz, opts) {
+    if (quiz.type === 'toNet') {
+      return Render.solidView(quiz.solid, quiz.faces, 128, { strokeWidth: 2 });
+    }
+    if (quiz.type === 'toFaces') {
+      return Render.solidView(quiz.solid, null, 128, { strokeWidth: 2 });
+    }
+    var cells = opts.netCells || quiz.netCells || netCells();
+    if (!cells) return null;
+    // tipe "bentuk bangunnya": jaring digambar polos, seperti pada soal aslinya
+    var faces = quiz.type === 'toShape' ? null : (opts.netFaces || quiz.faces || state.faces);
+    return netFit(cells, faces, 280, 190, 2);
+  }
+
+  /** Gambar satu pilihan jawaban. */
+  function optionRender(quiz, opt, size) {
+    if (opt.kind === 'net') return netFit(opt.net.cells, opt.faces, size, size * 0.88, 1.8);
+    if (opt.kind === 'shape') return Render.solidView(opt.solid, null, size, { strokeWidth: 2 });
+    if (opt.kind === 'faces') return Render.shapes(opt.comp, size * 0.62, { strokeWidth: 1.8 });
+    return Render.solidView(quiz.solid, opt.faces, size, { strokeWidth: 2 });
+  }
+
   function sheetSVG(quiz, opts) {
     opts = opts || {};
-    var pad = 22, gap = 16, size = opts.size || 92, titleSize = 15;
-    var cells = opts.netCells || netCells();
-    var faces = opts.netFaces || state.faces;
-    if (!cells) return '';
+    var pad = 22, gap = 16, titleSize = 15;
+    var head = questionRender(quiz, opts);
+    if (!head) return '';
 
-    var b = Solids.boundsOf(cells);
-    var netScale = Math.max(30, Math.min(56, 260 / Math.max(b.w, b.h)));
-    var netR = Render.net(cells, faces, netScale, { strokeWidth: 2 });
-
-    var first = Render.solidView(quiz.solid, quiz.options[0].faces, size);
-    var n = quiz.options.length;
-    var rowW = n * first.width + (n - 1) * gap;
-    var width = Math.max(pad * 2 + rowW, pad * 2 + netR.width, 560);
+    var size = opts.size || (quiz.type === 'toNet' ? 124 : 92);
+    var rends = quiz.options.map(function (o) { return optionRender(quiz, o, size); });
+    var slotW = Math.max.apply(null, rends.map(function (r) { return r.width; }));
+    var slotH = Math.max.apply(null, rends.map(function (r) { return r.height; }));
+    var n = rends.length;
+    var rowW = n * slotW + (n - 1) * gap;
+    var width = Math.max(pad * 2 + rowW, pad * 2 + head.width, 560);
 
     var parts = [];
     var y = pad;
@@ -353,24 +383,26 @@
       parts.push(Render.text(opts.title, pad, y, { size: titleSize }));
       y += 14;
     }
-    parts.push('<g transform="translate(' + Render.num((width - netR.width) / 2) + ',' + y + ')">' +
-      netR.svg + '</g>');
-    y += netR.height + 30;
+    parts.push('<g transform="translate(' + Render.num((width - head.width) / 2) + ',' + y + ')">' +
+      head.svg + '</g>');
+    y += head.height + 30;
 
     var x0 = (width - rowW) / 2;
     quiz.options.forEach(function (opt, i) {
-      var x = x0 + i * (first.width + gap);
-      var r = Render.solidView(quiz.solid, opt.faces, size);
+      var r = rends[i];
+      var slotX = x0 + i * (slotW + gap);
+      var x = slotX + (slotW - r.width) / 2;          // pusatkan dalam slot yang sama lebar
+      var yy = y + (slotH - r.height) / 2;
       if (opts.showKey && i === quiz.answerIndex) {
-        parts.push('<rect x="' + Render.num(x - 7) + '" y="' + Render.num(y - 7) + '" width="' +
-          Render.num(r.width + 14) + '" height="' + Render.num(r.height + 30) +
+        parts.push('<rect x="' + Render.num(slotX - 7) + '" y="' + Render.num(y - 7) + '" width="' +
+          Render.num(slotW + 14) + '" height="' + Render.num(slotH + 30) +
           '" rx="8" fill="#e6f6f0" stroke="#12805c" stroke-width="2"/>');
       }
-      parts.push('<g transform="translate(' + Render.num(x) + ',' + y + ')">' + r.svg + '</g>');
-      parts.push(Render.text(String.fromCharCode(65 + i) + '.', x + r.width / 2, y + r.height + 18,
+      parts.push('<g transform="translate(' + Render.num(x) + ',' + Render.num(yy) + ')">' + r.svg + '</g>');
+      parts.push(Render.text(String.fromCharCode(65 + i) + '.', slotX + slotW / 2, y + slotH + 18,
         { size: 15, weight: 700, anchor: 'middle' }));
     });
-    y += first.height + 26;
+    y += slotH + 26;
 
     if (opts.showKey) {
       y += 20;
@@ -401,6 +433,13 @@
     $('answer-reveal').textContent = '';
   }
 
+  function benarText(q) {
+    if (q.type === 'toNet') return 'Benar. Jaring-jaring itu terlipat menjadi bangun pada soal.';
+    if (q.type === 'toShape') return 'Benar. Bangunnya ' + q.describe + '.';
+    if (q.type === 'toFaces') return 'Benar. Bangun itu tersusun dari ' + q.describe + '.';
+    return 'Benar. ' + q.describe + '.';
+  }
+
   function answerClicked(i) {
     var q = state.quiz;
     if (!q) return;
@@ -412,7 +451,7 @@
     if (opt.correct) {
       btn.classList.add('right');
       fb.className = 'feedback ok';
-      fb.textContent = 'Benar. ' + q.describe + '.';
+      fb.textContent = benarText(q);
     } else {
       btn.classList.add('wrong');
       $('answer-buttons').children[q.answerIndex].classList.add('right');
@@ -422,17 +461,50 @@
     $('answer-reveal').textContent = 'Kunci: ' + q.answerLetter + ' (' + q.describe + ').';
   }
 
-  function generate() {
-    if (!netCells()) { flash('Jaring-jaring belum sah.'); return null; }
-    var q = Quiz.generate(state.solid, state.faces, { difficulty: $('difficulty').value });
-    var check = Quiz.audit(q);
+  var _allSolids = null;
+  function allSolids() {
+    if (!_allSolids) {
+      _allSolids = Object.keys(Solids.CATALOG).map(function (id) { return Solids.build(id); });
+    }
+    // pakai balok dengan ukuran yang sedang dipilih pengguna
+    return _allSolids.map(function (s) {
+      return s.id === state.solidId ? state.solid : s;
+    });
+  }
+
+  /** Buat satu soal sesuai tipe yang dipilih, lengkap dengan pemeriksaan mandiri. */
+  function makeQuiz(netCellsOverride) {
+    var type = $('qtype').value;
+    var q, check;
+    if (type === 'toNet') {
+      q = Quiz.generateNetChoice(state.solid, state.faces, state.nets, {});
+      check = Quiz.auditAlt(q);
+    } else if (type === 'toFaces') {
+      q = Quiz.generateFaceChoice(state.solid, allSolids(), {});
+      check = Quiz.auditAlt(q);
+    } else if (type === 'toShape') {
+      q = Quiz.generateShapeChoice(state.solid, allSolids(), {});
+      q.netCells = netCellsOverride || netCells();
+      check = Quiz.auditAlt(q);
+    } else {
+      q = Quiz.generate(state.solid, state.faces, { difficulty: $('difficulty').value });
+      q.netCells = netCellsOverride || netCells();
+      check = Quiz.audit(q);
+    }
     if (!check.ok) {
       q.warnings.push('Pemeriksaan internal menemukan keanehan (pilihan sah: ' + check.validCount +
         ', kembar: ' + check.duplicates + '). Silakan buat ulang soal.');
     }
-    state.quiz = q;
-    renderQuiz();
     return q;
+  }
+
+  function generate() {
+    var t = $('qtype').value;
+    // tipe yang soalnya menampilkan bangun 3D tidak butuh jaring yang sah
+    if (t !== 'toNet' && t !== 'toFaces' && !netCells()) { flash('Jaring-jaring belum sah.'); return null; }
+    state.quiz = makeQuiz();
+    renderQuiz();
+    return state.quiz;
   }
 
   function flash(msg) {
@@ -453,15 +525,26 @@
     renderBank();
   }
 
+  function quizKey(q) {
+    return q.options.map(function (o) {
+      return o.sig || o.key || (o.solid && o.solid.id) || '';
+    }).join('||');
+  }
+
   function addManyToBank(target) {
-    if (!netCells()) { flash('Jaring-jaring belum sah.'); return; }
+    var t = $('qtype').value;
+    if (t !== 'toNet' && t !== 'toFaces' && !netCells()) { flash('Jaring-jaring belum sah.'); return; }
     var seen = {}, added = 0, tries = 0;
     while (added < target && tries < target * 12) {
       tries++;
-      var q = Quiz.generate(state.solid, state.faces, { difficulty: $('difficulty').value });
-      var sig = q.options.map(function (o) { return o.sig; }).join('||');
-      if (seen[sig] || !Quiz.audit(q).ok) continue;
-      seen[sig] = true;
+      // tipe yang menampilkan jaring pada soal: pakai bentuk jaring berbeda tiap nomor
+      var alt = null;
+      if (state.mode !== 'grid' && state.nets.length > 1) {
+        alt = state.nets[(added + tries) % state.nets.length].cells;
+      }
+      var q = makeQuiz(alt);
+      if (seen[quizKey(q)] && q.type !== 'toShape') continue;
+      seen[quizKey(q)] = true;
       addToBank(q);
       added++;
     }
@@ -561,7 +644,11 @@
       { type: 'square' }, { type: 'circle' }, { type: 'ring' }, { type: 'triangle' },
       { type: 'arrow' }, { type: 'star' }, { type: 'plus' }, { type: 'ex' },
       { type: 'diag' }, { type: 'half' }, { type: 'stripe' }, { type: 'corner' },
-      { type: 'ell' }, { type: 'blank' },
+      { type: 'ell' }, { type: 'blank' }, { type: 'diamond' }, { type: 'frame' },
+      { type: 'dots2' }, { type: 'bars' }, { type: 'checker' }, { type: 'chevron' },
+      { type: 'halfCircle' }, { type: 'quarter' }, { type: 'pentagon' }, { type: 'hexagon' },
+      { type: 'bowtie' }, { type: 'zigzag' }, { type: 'heart' }, { type: 'moon' },
+      { type: 'rightTri' }, { type: 'tee' },
       { type: 'text', text: 'A' }, { type: 'text', text: 'B' }, { type: 'text', text: 'F' },
       { type: 'text', text: 'L' }, { type: 'text', text: 'R' }, { type: 'text', text: '4' }
     ];
@@ -736,6 +823,11 @@
     });
 
     $('btn-generate').addEventListener('click', generate);
+    $('qtype').addEventListener('change', function () {
+      // tingkat kesulitan hanya berpengaruh pada tipe "jaring-jaring -> bangun ruang"
+      $('difficulty').disabled = this.value !== 'toSolid';
+      if (state.quiz) generate();
+    });
     $('difficulty').addEventListener('change', function () { if (state.quiz) generate(); });
     $('show-key').addEventListener('change', function () { if (state.quiz) renderQuiz(); });
     $('answer-buttons').addEventListener('click', function (e) {

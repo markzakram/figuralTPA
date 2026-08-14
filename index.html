@@ -133,9 +133,9 @@
     </div>
 
     <div class="quick">
-      <button class="ghost" id="btn-dice" type="button">Isi bernomor</button>
-      <button class="ghost" id="btn-random" type="button">Acak isi sisi</button>
-      <button class="ghost" id="btn-clear-art" type="button">Kosongkan isi</button>
+      <button class="ghost" id="btn-dice" type="button" title="Isi otomatis dengan angka/mata dadu">Isi angka</button>
+      <button class="ghost" id="btn-random" type="button" title="Acak gambar seluruh sisi">Acak</button>
+      <button class="ghost" id="btn-clear-art" type="button" title="Kosongkan gambar seluruh sisi">Kosongkan</button>
     </div>
   </section>
 
@@ -144,6 +144,15 @@
     <h2><span class="step">5</span> Soal &amp; pilihan jawaban</h2>
 
     <div class="row gap-s wrap">
+      <label class="field inline">
+        <span>Tipe soal</span>
+        <select id="qtype">
+          <option value="toSolid" selected>Jaring-jaring &rarr; bangun ruang</option>
+          <option value="toNet">Bangun ruang &rarr; jaring-jaring</option>
+          <option value="toShape">Jaring-jaring &rarr; bentuk bangunnya</option>
+          <option value="toFaces">Bangun ruang &rarr; bangun datar penyusunnya</option>
+        </select>
+      </label>
       <label class="field inline">
         <span>Tingkat kesulitan</span>
         <select id="difficulty">

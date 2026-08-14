@@ -41,6 +41,16 @@
       '" fill="' + fill + '"/>';
   }
 
+  /** titik-titik poligon beraturan n sisi, radius r, mulai dari sudut a0 derajat */
+  function regular(n, r, a0) {
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var a = (a0 + i * 360 / n) * Math.PI / 180;
+      out.push([+(50 + r * Math.cos(a)).toFixed(2), +(50 + r * Math.sin(a)).toFixed(2)]);
+    }
+    return out;
+  }
+
   var TYPES = [
     {
       id: 'blank', label: 'Polos', sym: 0, uses: [],
@@ -141,6 +151,101 @@
     {
       id: 'ell', label: 'Bentuk L', sym: 1, uses: [],
       draw: function (p) { return poly([[26, 18], [46, 18], [46, 62], [80, 62], [80, 82], [26, 82]], p.fg); }
+    },
+    {
+      id: 'diamond', label: 'Wajik', sym: 4, uses: [],
+      draw: function (p) { return poly([[50, 16], [84, 50], [50, 84], [16, 50]], p.fg); }
+    },
+    {
+      id: 'frame', label: 'Bingkai', sym: 4, uses: [],
+      draw: function (p) {
+        return '<rect x="22" y="22" width="56" height="56" fill="none" stroke="' + p.fg + '" stroke-width="13"/>';
+      }
+    },
+    {
+      id: 'dots2', label: 'Dua titik', sym: 2, uses: [],
+      draw: function (p) {
+        return '<circle cx="30" cy="50" r="11" fill="' + p.fg + '"/>' +
+          '<circle cx="70" cy="50" r="11" fill="' + p.fg + '"/>';
+      }
+    },
+    {
+      id: 'bars', label: 'Tiga garis', sym: 2, uses: [],
+      draw: function (p) {
+        return [26, 46, 66].map(function (y) {
+          return '<rect x="16" y="' + y + '" width="68" height="10" fill="' + p.fg + '"/>';
+        }).join('');
+      }
+    },
+    {
+      id: 'checker', label: 'Papan catur', sym: 2, uses: [],
+      draw: function (p) {
+        return '<rect x="10" y="10" width="40" height="40" fill="' + p.fg + '"/>' +
+          '<rect x="50" y="50" width="40" height="40" fill="' + p.fg + '"/>';
+      }
+    },
+    {
+      id: 'chevron', label: 'Sudut panah', sym: 1, uses: [],
+      draw: function (p) {
+        return poly([[50, 18], [86, 54], [70, 54], [50, 34], [30, 54], [14, 54]], p.fg) +
+          poly([[50, 46], [86, 82], [70, 82], [50, 62], [30, 82], [14, 82]], p.fg);
+      }
+    },
+    {
+      id: 'halfCircle', label: 'Setengah lingkaran', sym: 1, uses: [],
+      draw: function (p) {
+        return '<path d="M18,62 A32,32 0 0 1 82,62 Z" fill="' + p.fg + '"/>';
+      }
+    },
+    {
+      id: 'quarter', label: 'Seperempat lingkaran', sym: 1, uses: [],
+      draw: function (p) {
+        return '<path d="M14,14 L74,14 A60,60 0 0 1 14,74 Z" fill="' + p.fg + '"/>';
+      }
+    },
+    {
+      id: 'pentagon', label: 'Segilima', sym: 1, uses: [],
+      draw: function (p) { return poly(regular(5, 36, -90), p.fg); }
+    },
+    {
+      id: 'hexagon', label: 'Segienam', sym: 2, uses: [],
+      draw: function (p) { return poly(regular(6, 36, 0), p.fg); }
+    },
+    {
+      id: 'bowtie', label: 'Dasi', sym: 2, uses: [],
+      draw: function (p) {
+        return poly([[18, 22], [18, 78], [50, 50]], p.fg) + poly([[82, 22], [82, 78], [50, 50]], p.fg);
+      }
+    },
+    {
+      id: 'zigzag', label: 'Zigzag', sym: 1, uses: [],
+      draw: function (p) {
+        return '<polyline points="14,66 36,34 58,66 86,30" fill="none" stroke="' + p.fg +
+          '" stroke-width="12" stroke-linejoin="round" stroke-linecap="round"/>';
+      }
+    },
+    {
+      id: 'heart', label: 'Hati', sym: 1, uses: [],
+      draw: function (p) {
+        return '<path d="M50,82 C14,58 16,26 34,24 C44,23 50,32 50,36 C50,32 56,23 66,24 C84,26 86,58 50,82 Z" fill="' + p.fg + '"/>';
+      }
+    },
+    {
+      id: 'moon', label: 'Bulan sabit', sym: 1, uses: [],
+      draw: function (p) {
+        return '<path d="M62,16 A36,36 0 1 0 62,84 A28,34 0 1 1 62,16 Z" fill="' + p.fg + '"/>';
+      }
+    },
+    {
+      id: 'rightTri', label: 'Segitiga siku-siku', sym: 1, uses: [],
+      draw: function (p) { return poly([[18, 18], [18, 82], [82, 82]], p.fg); }
+    },
+    {
+      id: 'tee', label: 'Bentuk T', sym: 1, uses: [],
+      draw: function (p) {
+        return '<rect x="16" y="18" width="68" height="20" fill="' + p.fg + '"/>' +
+          '<rect x="40" y="38" width="20" height="46" fill="' + p.fg + '"/>';
+      }
     }
   ];
 

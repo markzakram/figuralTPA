@@ -187,6 +187,42 @@
     return { face: face, poly: poly, box: box };
   }
 
+  // ---------------------------------------------------------------- bangun datar penyusun
+
+  /**
+   * Gambar bangun datar penyusun sebuah bangun ruang: tiap bentuk berbeda
+   * digambar sekali dengan keterangan jumlahnya, mis. "2×" segitiga "3×" persegi.
+   */
+  function shapes(list, box, opts) {
+    opts = opts || {};
+    var stroke = opts.stroke || '#111111';
+    var sw = opts.strokeWidth != null ? opts.strokeWidth : 1.8;
+    var gap = 12, labelW = 20, parts = [], x = 0, maxH = 0;
+
+    // skala bersama supaya perbandingan ukuran antar bentuk tetap terbaca
+    var span = 0;
+    list.forEach(function (c) {
+      c.poly.forEach(function (p) { span = Math.max(span, Math.abs(p[0]), Math.abs(p[1])); });
+    });
+    var k = (box / 2) / (span || 1);
+
+    list.forEach(function (c) {
+      var w = 0, h = 0;
+      var pl = c.poly.map(function (p) { return [p[0] * k, p[1] * k]; });
+      var xs = pl.map(function (p) { return p[0]; }), ys = pl.map(function (p) { return p[1]; });
+      var x0 = Math.min.apply(null, xs), y0 = Math.min.apply(null, ys);
+      w = Math.max.apply(null, xs) - x0; h = Math.max.apply(null, ys) - y0;
+      parts.push(text(c.count + '×', x, box / 2 + 5, { size: 13, weight: 700 }));
+      parts.push('<polygon points="' +
+        pl.map(function (p) { return num(p[0] - x0 + x + labelW) + ',' + num(p[1] - y0 + (box - h) / 2); }).join(' ') +
+        '" fill="#ffffff" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linejoin="round"/>');
+      x += labelW + w + gap;
+      maxH = Math.max(maxH, box);
+    });
+
+    return { svg: parts.join(''), width: Math.max(0, x - gap), height: maxH };
+  }
+
   // ---------------------------------------------------------------- pembungkus
 
   function doc(inner, w, h, opts) {
@@ -208,6 +244,6 @@
   return {
     oblique: oblique, ortho: ortho, yawPitch: yawPitch, projectionFor: projectionFor,
     solid: solid, solidView: solidView, solidSpin: solidSpin,
-    net: net, gridCell: gridCell, doc: doc, text: text, num: num
+    net: net, gridCell: gridCell, shapes: shapes, doc: doc, text: text, num: num
   };
 });

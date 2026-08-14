@@ -216,15 +216,16 @@
     }
 
     var items = distractors.map(function (d) {
-      return { faces: d.faces, correct: false, reason: d.reason, strategy: d.strategy, sig: d.sig };
+      return { kind: 'solid', faces: d.faces, correct: false, reason: d.reason, strategy: d.strategy, sig: d.sig };
     });
-    items.push({ faces: answer.faces, correct: true, reason: '', strategy: 'kunci', sig: answer.sig });
+    items.push({ kind: 'solid', faces: answer.faces, correct: true, reason: '', strategy: 'kunci', sig: answer.sig });
     items = shuffle(items, rnd);
 
     var answerIndex = -1;
     items.forEach(function (it, i) { if (it.correct) answerIndex = i; });
 
     return {
+      type: 'toSolid',
       solid: solid, faces: faces, options: items, answerIndex: answerIndex,
       answerLetter: String.fromCharCode(65 + answerIndex),
       warnings: warnings, describe: describeView(solid, answer.faces)
@@ -235,6 +236,249 @@
     return solid.visible.map(function (i) {
       return solid.faces[i].name.toLowerCase() + ' = ' + Art.label(faces[i].art);
     }).join(', ');
+  }
+
+  // =================================================================
+  // TIPE B — diberi bangun ruang, pilih JARING-JARING yang benar
+  // =================================================================
+
+  /**
+   * Sebuah jaring-jaring benar bila hasil lipatannya DAPAT diputar sehingga
+   * tampak persis seperti gambar pada soal. Penilaian memakai sisi yang terlihat
+   * saja, karena sisi tersembunyi memang tidak bisa dinilai oleh penjawab.
+   */
+  function netIsValid(solid, trueSig, candFaces) {
+    return validViews(solid, candFaces).set[trueSig] === true;
+  }
+
+  function scrambles(solid, faces) {
+    var out = [], n = solid.faces.length, i, j;
+    for (i = 0; i < n; i++) {
+      for (j = i + 1; j < n; j++) {
+        if (solid.faces[i].sides !== solid.faces[j].sides) continue;
+        if (Art.visualKey(faces[i].art, faces[i].rot) === Art.visualKey(faces[j].art, faces[j].rot)) continue;
+        var sw = copyFaces(faces);
+        var t = sw[i]; sw[i] = sw[j]; sw[j] = t;
+        out.push({ faces: sw, reason: 'letak dua sisinya tertukar, jadi hasil lipatannya berbeda' });
+
+        var dup = copyFaces(faces);
+        dup[j] = { art: faces[i].art, rot: faces[i].rot };
+        out.push({
+          faces: dup,
+          reason: Art.label(faces[i].art) + ' terpasang di dua sisi, padahal hanya ada satu'
+        });
+      }
+    }
+    for (i = 0; i < n; i++) {
+      if (Art.isBlank(faces[i].art)) continue;
+      var steps = solid.faces[i].sides === 3 ? [120, 240] : [90, 180, 270];
+      for (var k = 0; k < steps.length; k++) {
+        if (Art.canonRot(faces[i].art, faces[i].rot + steps[k]) === Art.canonRot(faces[i].art, faces[i].rot)) continue;
+        var sp = copyFaces(faces);
+        sp[i] = { art: faces[i].art, rot: S.norm360(faces[i].rot + steps[k]) };
+        out.push({
+          faces: sp,
+          reason: 'arah gambar pada satu sisi menghadap ke arah yang salah setelah dilipat'
+        });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * @param {Object} solid bangun ruang
+   * @param {Array} faces isi tiap sisi
+   * @param {Array} nets daftar jaring-jaring (hasil Solids.nets)
+   */
+  function generateNetChoice(solid, faces, nets, opts) {
+    opts = opts || {};
+    var rnd = opts.rnd || Math.random;
+    var count = opts.count || 5;
+    var warnings = [];
+    var trueSig = signature(solid, faces);
+
+    if (!nets || !nets.length) {
+      return { type: 'toNet', solid: solid, faces: faces, options: [], answerIndex: -1, answerLetter: '-',
+        warnings: ['Bangun ini belum punya jaring-jaring yang bisa digambar.'], describe: '' };
+    }
+
+    // satu bentuk jaring berbeda untuk tiap pilihan, seperti soal aslinya
+    var layouts = shuffle(nets.map(function (_, i) { return i; }), rnd);
+    var pool = [];
+    for (var i = 0; i < count; i++) pool.push(layouts[i % layouts.length]);
+
+    var items = [{
+      kind: 'net', net: nets[pool[0]], faces: copyFaces(faces),
+      correct: true, reason: '', key: pool[0] + '|' + faceKey(solid, faces)
+    }];
+
+    var cands = shuffle(scrambles(solid, faces), rnd);
+    var used = {};
+    used[items[0].key] = true;
+    for (var c = 0; c < cands.length && items.length < count; c++) {
+      if (netIsValid(solid, trueSig, cands[c].faces)) continue;   // ternyata benar juga
+      var layout = pool[items.length];
+      var key = layout + '|' + faceKey(solid, cands[c].faces);
+      if (used[key]) continue;
+      used[key] = true;
+      items.push({
+        kind: 'net', net: nets[layout], faces: cands[c].faces,
+        correct: false, reason: cands[c].reason, key: key
+      });
+    }
+
+    if (items.length < count) {
+      warnings.push('Hanya bisa dibuat ' + (items.length - 1) + ' pengecoh yang benar-benar salah. ' +
+        'Tambahkan variasi gambar antar sisi.');
+    }
+
+    items = shuffle(items, rnd);
+    var answerIndex = -1;
+    items.forEach(function (it, k) { if (it.correct) answerIndex = k; });
+
+    return {
+      type: 'toNet', solid: solid, faces: faces, options: items,
+      answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
+      warnings: warnings, describe: describeView(solid, faces)
+    };
+  }
+
+  function faceKey(solid, faces) {
+    return faces.map(function (f) { return Art.visualKey(f.art, f.rot); }).join(',');
+  }
+
+  // =================================================================
+  // TIPE C — diberi jaring-jaring, pilih BENTUK bangun ruangnya
+  // =================================================================
+
+  /**
+   * @param {Object} target bangun yang benar
+   * @param {Array} others kandidat bangun lain (sudah dibangun)
+   */
+  function generateShapeChoice(target, others, opts) {
+    opts = opts || {};
+    var rnd = opts.rnd || Math.random;
+    var count = opts.count || 5;
+    var warnings = [];
+    var tKey = S.shapeKey(target);
+
+    // buang bangun yang sebenarnya kongruen dengan jawaban (mis. balok 1:1:1 = kubus)
+    var pool = shuffle(others.filter(function (s) {
+      return s.id !== target.id && S.shapeKey(s) !== tKey;
+    }), rnd);
+
+    var items = [{ kind: 'shape', solid: target, correct: true, reason: '' }];
+    for (var i = 0; i < pool.length && items.length < count; i++) {
+      items.push({
+        kind: 'shape', solid: pool[i], correct: false,
+        reason: 'itu ' + pool[i].name.toLowerCase() + ', jaring-jaringnya terdiri dari ' +
+          ringkasSisi(pool[i]) + ' — tidak cocok dengan gambar'
+      });
+    }
+    if (items.length < count) {
+      warnings.push('Hanya tersedia ' + (items.length - 1) + ' bangun pembanding yang berbeda bentuk.');
+    }
+
+    items = shuffle(items, rnd);
+    var answerIndex = -1;
+    items.forEach(function (it, k) { if (it.correct) answerIndex = k; });
+
+    return {
+      type: 'toShape', solid: target, faces: null, options: items,
+      answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
+      warnings: warnings, describe: target.name.toLowerCase() + ' (' + ringkasSisi(target) + ')'
+    };
+  }
+
+  // =================================================================
+  // TIPE D — diberi bangun ruang, pilih BANGUN DATAR penyusunnya
+  // =================================================================
+
+  /**
+   * @param {Object} target bangun yang benar
+   * @param {Array} others kandidat bangun lain (dipakai komposisi sisinya sebagai pengecoh)
+   */
+  function generateFaceChoice(target, others, opts) {
+    opts = opts || {};
+    var rnd = opts.rnd || Math.random;
+    var count = opts.count || 5;
+    var warnings = [];
+    var tKey = S.compositionKey(target);
+
+    var seen = {};
+    seen[tKey] = true;
+    var pool = shuffle(others, rnd).filter(function (s) {
+      var k = S.compositionKey(s);
+      if (seen[k]) return false;          // komposisinya sama dengan kunci -> bukan pengecoh
+      seen[k] = true;
+      return true;
+    });
+
+    var items = [{
+      kind: 'faces', solid: target, comp: S.composition(target),
+      correct: true, reason: '', key: tKey
+    }];
+    for (var i = 0; i < pool.length && items.length < count; i++) {
+      items.push({
+        kind: 'faces', solid: pool[i], comp: S.composition(pool[i]), correct: false,
+        key: S.compositionKey(pool[i]),
+        reason: 'itu susunan sisi ' + pool[i].name.toLowerCase() + ' (' + S.compositionText(pool[i]) + ')'
+      });
+    }
+    if (items.length < count) {
+      warnings.push('Hanya tersedia ' + (items.length - 1) + ' susunan bangun datar yang berbeda.');
+    }
+
+    items = shuffle(items, rnd);
+    var answerIndex = -1;
+    items.forEach(function (it, k) { if (it.correct) answerIndex = k; });
+
+    return {
+      type: 'toFaces', solid: target, faces: null, options: items,
+      answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
+      warnings: warnings, describe: S.compositionText(target)
+    };
+  }
+
+  function ringkasSisi(solid) {
+    var by = {};
+    solid.faces.forEach(function (f) { by[f.sides] = (by[f.sides] || 0) + 1; });
+    var nama = { 3: 'segitiga', 4: 'segiempat', 5: 'segilima', 6: 'segienam' };
+    return Object.keys(by).sort().map(function (k) {
+      return by[k] + ' ' + (nama[k] || 'segi-' + k);
+    }).join(' + ');
+  }
+
+  /** Pemeriksaan mandiri untuk soal tipe B dan C. */
+  function auditAlt(quiz) {
+    var validCount = 0, dupes = 0, seen = {};
+    if (quiz.type === 'toNet') {
+      var trueSig = signature(quiz.solid, quiz.faces);
+      quiz.options.forEach(function (o) {
+        if (netIsValid(quiz.solid, trueSig, o.faces)) validCount++;
+        if (seen[o.key]) dupes++;
+        seen[o.key] = true;
+      });
+    } else if (quiz.type === 'toFaces') {
+      var cKey = S.compositionKey(quiz.solid);
+      quiz.options.forEach(function (o) {
+        if (S.compositionKey(o.solid) === cKey) validCount++;
+        if (seen[o.key]) dupes++;
+        seen[o.key] = true;
+      });
+    } else {
+      var tKey = S.shapeKey(quiz.solid);
+      quiz.options.forEach(function (o) {
+        if (S.shapeKey(o.solid) === tKey) validCount++;
+        if (seen[o.solid.id]) dupes++;
+        seen[o.solid.id] = true;
+      });
+    }
+    return {
+      ok: validCount === 1 && dupes === 0 && quiz.answerIndex >= 0,
+      validCount: validCount, duplicates: dupes,
+      answerIsValid: quiz.options[quiz.answerIndex] ? quiz.options[quiz.answerIndex].correct === true : false
+    };
   }
 
   /** Pemeriksaan mandiri: pastikan tepat satu pilihan yang sah. */
@@ -256,6 +500,9 @@
 
   return {
     signature: signature, validViews: validViews, generate: generate,
-    audit: audit, describeView: describeView, shuffle: shuffle
+    generateNetChoice: generateNetChoice, generateShapeChoice: generateShapeChoice,
+    generateFaceChoice: generateFaceChoice,
+    netIsValid: netIsValid, audit: audit, auditAlt: auditAlt,
+    describeView: describeView, ringkasSisi: ringkasSisi, shuffle: shuffle
   };
 });
