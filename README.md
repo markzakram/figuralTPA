@@ -61,10 +61,48 @@ dan lainnya — masing-masing dengan 9 pilihan warna gambar dan warna latar.
 5. **Buat soal.** Pilih tipe soal (dan tingkat kesulitan untuk tipe A) lalu tekan
    *Buat soal*. Tombol A–E di bawah lembar soal bisa diklik untuk mengecek jawaban
    beserta alasannya.
-6. **Simpan.** Unduh PNG/SVG, atau kumpulkan beberapa soal ke bank soal lalu
-   *Cetak / simpan PDF* (halaman terakhir berisi kunci jawaban).
+6. **Buat sepaket dan unduh PDF.** Isi *Jumlah* soal, pilih variasinya, tekan
+   **Generate**, lalu **Unduh PDF**.
 
 Pilihan terakhir tersimpan otomatis di peramban.
+
+## Membuat banyak soal sekaligus
+
+Panel *Buat banyak soal & unduh PDF* menerima jumlah soal (1–200) dengan dua pilihan
+variasi:
+
+| Pilihan | Arti |
+|---|---|
+| Variasi: *Acak gambar sisi* | tiap soal memakai gambar sisi baru, bangun ruangnya tetap |
+| Variasi: *Acak gambar + bangun ruang* | bangun ruang ikut berganti-ganti antar soal |
+| Variasi: *Ikuti isian sekarang* | semua soal memakai isian yang sedang tampil |
+| Tipe: *Ikuti pilihan di atas* | satu tipe soal untuk seluruh paket |
+| Tipe: *Campuran semua tipe* | keempat tipe soal dipakai bergantian |
+
+Bentuk jaring-jaring juga diacak dari daftar jaring bangun tersebut, sehingga soal
+yang berdekatan tidak memakai bentuk yang sama. Tombol *Acak* pada editor punya
+centang **Warna tetap**: gambar tiap sisi diacak tetapi warna gambar dan warna
+latarnya dipertahankan.
+
+## Format PDF
+
+Mengikuti format PDF generator *diagrammatical*: halaman **1440 × 810 pt**
+(20 × 11,25 inci, 16:9) dan **empat halaman per soal**:
+
+1. **Judul** — nomor soal, tipe soal, dan tingkat kesulitan (berwarna).
+2. **Gambar soal** — jaring-jaring atau bangun ruang, tergantung tipe.
+3. **Pilihan A–E**.
+4. **Kunci & pembahasan** — jawaban benar, alasannya, dan satu baris untuk tiap
+   pilihan yang salah.
+
+PDF disusun langsung tanpa pustaka luar: gambar disisipkan sebagai XObject
+`DeviceGray` bila hitam-putih (datanya sepertiga) atau `DeviceRGB` bila berwarna,
+dipadatkan dengan `CompressionStream` bawaan peramban, dan teksnya memakai Helvetica
+bawaan pembaca PDF sehingga tidak perlu disematkan. 30 soal ≈ 120 halaman ≈ 0,9 MB,
+selesai dalam ~1,2 detik.
+
+Tombol *Cetak* tetap ada untuk mencetak bank soal sebagai lembar A4 biasa (kunci
+jawaban di halaman terakhir).
 
 ## Cara kerja & jaminan kebenaran
 
@@ -127,8 +165,10 @@ css/style.css       tampilan + aturan cetak
 js/solids.js        definisi bangun ruang, grup simetri, pembukaan & pencacahan jaring
 js/geometry.js      pelipatan jaring-jaring papan (mode susun sendiri, kubus/balok)
 js/art.js           pustaka gambar sisi + aturan simetri
-js/render.js        penggambar SVG (bangun ruang 3D & jaring-jaring)
-js/quiz.js          pembuat pilihan A–E + pemeriksa mandiri
+js/render.js        penggambar SVG (bangun ruang 3D, jaring-jaring, bangun datar)
+js/quiz.js          pembuat pilihan A–E keempat tipe + pemeriksa mandiri
+js/raster.js        SVG → piksel (untuk PDF) dan penyimpan berkas
+js/pdf.js           penyusun PDF 1440×810, 4 halaman per soal, tanpa pustaka luar
 js/app.js           perekat antarmuka
 ```
 

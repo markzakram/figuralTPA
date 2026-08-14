@@ -136,6 +136,9 @@
       <button class="ghost" id="btn-dice" type="button" title="Isi otomatis dengan angka/mata dadu">Isi angka</button>
       <button class="ghost" id="btn-random" type="button" title="Acak gambar seluruh sisi">Acak</button>
       <button class="ghost" id="btn-clear-art" type="button" title="Kosongkan gambar seluruh sisi">Kosongkan</button>
+      <label class="check" title="Saat mengacak, warna gambar dan latar tiap sisi dipertahankan">
+        <input type="checkbox" id="keep-color"> Warna tetap
+      </label>
     </div>
   </section>
 
@@ -183,15 +186,37 @@
     <div class="row gap-s wrap" id="quiz-actions" hidden>
       <button class="ghost" id="btn-png" type="button">Unduh PNG</button>
       <button class="ghost" id="btn-svg" type="button">Unduh SVG</button>
-      <button class="ghost" id="btn-add-bank" type="button">Tambah ke bank soal</button>
-      <button class="ghost" id="btn-add-many" type="button">Tambah 5 soal berbeda</button>
+      <button class="ghost" id="btn-add-bank" type="button">Tambah ke bank</button>
     </div>
 
-    <h3>Bank soal (<span id="bank-count">0</span>)</h3>
-    <div class="row gap-s wrap">
-      <button class="ghost" id="btn-print" type="button">Cetak / simpan PDF</button>
-      <button class="ghost danger" id="btn-clear-bank" type="button">Kosongkan bank</button>
+    <h3>Buat banyak soal &amp; unduh PDF (<span id="bank-count">0</span> soal)</h3>
+    <div class="row gap-s wrap batch">
+      <label class="num-field" title="Berapa soal yang dibuat sekaligus">
+        <span>Jumlah</span>
+        <input type="number" id="batch-count" value="10" min="1" max="200">
+      </label>
+      <label class="num-field" title="Variasi antar soal">
+        <span>Variasi</span>
+        <select id="batch-vary">
+          <option value="art" selected>Acak gambar sisi</option>
+          <option value="artSolid">Acak gambar + bangun ruang</option>
+          <option value="tetap">Ikuti isian sekarang</option>
+        </select>
+      </label>
+      <label class="num-field" title="Tipe soal untuk seluruh paket">
+        <span>Tipe</span>
+        <select id="batch-type">
+          <option value="ikut" selected>Ikuti pilihan di atas</option>
+          <option value="campur">Campuran semua tipe</option>
+        </select>
+      </label>
+      <button class="primary" id="btn-batch" type="button">Generate</button>
+      <button class="ghost" id="btn-pdf" type="button">Unduh PDF</button>
+      <button class="ghost" id="btn-print" type="button">Cetak</button>
+      <button class="ghost danger" id="btn-clear-bank" type="button">Kosongkan</button>
     </div>
+    <progress id="batch-progress" value="0" max="100" hidden></progress>
+    <div class="status-line" id="batch-status"></div>
     <div id="bank" class="bank"></div>
   </section>
 
@@ -204,6 +229,8 @@
 <script src="js/art.js"></script>
 <script src="js/render.js"></script>
 <script src="js/quiz.js"></script>
+<script src="js/raster.js"></script>
+<script src="js/pdf.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

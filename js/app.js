@@ -361,19 +361,43 @@
     return Render.solidView(quiz.solid, opt.faces, size, { strokeWidth: 2 });
   }
 
-  function sheetSVG(quiz, opts) {
+  /** Deretan pilihan A-E beserta labelnya, sebagai satu blok gambar. */
+  function optionsBlock(quiz, opts) {
     opts = opts || {};
-    var pad = 22, gap = 16, titleSize = 15;
-    var head = questionRender(quiz, opts);
-    if (!head) return '';
-
+    var gap = 16;
     var size = opts.size || (quiz.type === 'toNet' ? 124 : 92);
     var rends = quiz.options.map(function (o) { return optionRender(quiz, o, size); });
     var slotW = Math.max.apply(null, rends.map(function (r) { return r.width; }));
     var slotH = Math.max.apply(null, rends.map(function (r) { return r.height; }));
     var n = rends.length;
-    var rowW = n * slotW + (n - 1) * gap;
-    var width = Math.max(pad * 2 + rowW, pad * 2 + head.width, 560);
+    var width = n * slotW + (n - 1) * gap;
+    var parts = [];
+
+    quiz.options.forEach(function (opt, i) {
+      var r = rends[i];
+      var slotX = i * (slotW + gap);
+      var x = slotX + (slotW - r.width) / 2;      // pusatkan dalam slot yang sama lebar
+      var y = (slotH - r.height) / 2;
+      if (opts.showKey && i === quiz.answerIndex) {
+        parts.push('<rect x="' + Render.num(slotX - 7) + '" y="-7" width="' +
+          Render.num(slotW + 14) + '" height="' + Render.num(slotH + 30) +
+          '" rx="8" fill="#e6f6f0" stroke="#12805c" stroke-width="2"/>');
+      }
+      parts.push('<g transform="translate(' + Render.num(x) + ',' + Render.num(y) + ')">' + r.svg + '</g>');
+      parts.push(Render.text(String.fromCharCode(65 + i) + '.', slotX + slotW / 2, slotH + 18,
+        { size: 15, weight: 700, anchor: 'middle' }));
+    });
+
+    return { svg: parts.join(''), width: width, height: slotH + 26 };
+  }
+
+  function sheetSVG(quiz, opts) {
+    opts = opts || {};
+    var pad = 22, titleSize = 15;
+    var head = questionRender(quiz, opts);
+    if (!head) return '';
+    var blok = optionsBlock(quiz, opts);
+    var width = Math.max(pad * 2 + blok.width, pad * 2 + head.width, 560);
 
     var parts = [];
     var y = pad;
@@ -386,23 +410,9 @@
     parts.push('<g transform="translate(' + Render.num((width - head.width) / 2) + ',' + y + ')">' +
       head.svg + '</g>');
     y += head.height + 30;
-
-    var x0 = (width - rowW) / 2;
-    quiz.options.forEach(function (opt, i) {
-      var r = rends[i];
-      var slotX = x0 + i * (slotW + gap);
-      var x = slotX + (slotW - r.width) / 2;          // pusatkan dalam slot yang sama lebar
-      var yy = y + (slotH - r.height) / 2;
-      if (opts.showKey && i === quiz.answerIndex) {
-        parts.push('<rect x="' + Render.num(slotX - 7) + '" y="' + Render.num(y - 7) + '" width="' +
-          Render.num(slotW + 14) + '" height="' + Render.num(slotH + 30) +
-          '" rx="8" fill="#e6f6f0" stroke="#12805c" stroke-width="2"/>');
-      }
-      parts.push('<g transform="translate(' + Render.num(x) + ',' + Render.num(yy) + ')">' + r.svg + '</g>');
-      parts.push(Render.text(String.fromCharCode(65 + i) + '.', slotX + slotW / 2, y + slotH + 18,
-        { size: 15, weight: 700, anchor: 'middle' }));
-    });
-    y += slotH + 26;
+    parts.push('<g transform="translate(' + Render.num((width - blok.width) / 2) + ',' + y + ')">' +
+      blok.svg + '</g>');
+    y += blok.height;
 
     if (opts.showKey) {
       y += 20;
@@ -411,6 +421,23 @@
     }
 
     return Render.doc(parts.join(''), width, y + pad, { background: '#ffffff' });
+  }
+
+  /** Gambar soal saja (tanpa pilihan) — dipakai sebagai satu halaman PDF. */
+  function questionDoc(quiz) {
+    var r = questionRender(quiz, {});
+    if (!r) return '';
+    var pad = 16;
+    return Render.doc('<g transform="translate(' + pad + ',' + pad + ')">' + r.svg + '</g>',
+      r.width + pad * 2, r.height + pad * 2, { background: '#ffffff' });
+  }
+
+  /** Deretan pilihan saja — halaman PDF berikutnya. */
+  function optionsDoc(quiz) {
+    var b = optionsBlock(quiz, {});
+    var pad = 16;
+    return Render.doc('<g transform="translate(' + pad + ',' + pad + ')">' + b.svg + '</g>',
+      b.width + pad * 2, b.height + pad * 2, { background: '#ffffff' });
   }
 
   function renderQuiz() {
@@ -515,14 +542,51 @@
 
   // ---------------------------------------------------------------- bank soal
 
-  function addToBank(q) {
+  var TIPE_LABEL = {
+    toSolid: 'Jaring-jaring → bangun ruang',
+    toNet: 'Bangun ruang → jaring-jaring',
+    toShape: 'Jaring-jaring → bentuk bangun',
+    toFaces: 'Bangun ruang → bangun datar penyusun'
+  };
+  var TINGKAT_LABEL = { mudah: 'Mudah', sedang: 'Sedang', sulit: 'Sulit' };
+
+  /** Uraian jawaban untuk halaman pembahasan PDF. */
+  function pembahasan(q) {
+    var out = [];
+    var kunci = 'Jawaban benar: ' + q.answerLetter + '. ';
+    if (q.type === 'toNet') {
+      kunci += 'Jaring-jaring itu bila dilipat menghasilkan bangun pada soal — sisi yang tampak: ' +
+        q.describe + '.';
+    } else if (q.type === 'toShape') {
+      kunci += 'Jaring-jaring pada soal membentuk ' + q.describe + '.';
+    } else if (q.type === 'toFaces') {
+      kunci += 'Bangun pada soal tersusun dari ' + q.describe + '.';
+    } else {
+      kunci += 'Setelah jaring-jaring dilipat, sisi yang tampak adalah ' + q.describe + '.';
+    }
+    out.push(kunci);
+    out.push('Pilihan lain tidak mungkin:');
+    q.options.forEach(function (o, i) {
+      if (!o.correct) out.push(String.fromCharCode(65 + i) + '. ' + (o.reason || 'tidak sesuai') + '.');
+    });
+    return out;
+  }
+
+  function addToBank(q, diam) {
     q = q || state.quiz;
     if (!q) return;
     state.bank.push({
-      svg: sheetSVG(q, { showKey: false }),
-      letter: q.answerLetter, describe: q.describe, solid: q.solid.name
+      sheet: sheetSVG(q, { showKey: false }),
+      soalSvg: questionDoc(q),
+      pilihanSvg: optionsDoc(q),
+      letter: q.answerLetter,
+      describe: q.describe,
+      solid: q.solid.name,
+      tipe: TIPE_LABEL[q.type] || '',
+      tingkat: q.type === 'toSolid' ? (TINGKAT_LABEL[$('difficulty').value] || '') : '',
+      pembahasan: pembahasan(q)
     });
-    renderBank();
+    if (!diam) renderBank();
   }
 
   function quizKey(q) {
@@ -531,30 +595,10 @@
     }).join('||');
   }
 
-  function addManyToBank(target) {
-    var t = $('qtype').value;
-    if (t !== 'toNet' && t !== 'toFaces' && !netCells()) { flash('Jaring-jaring belum sah.'); return; }
-    var seen = {}, added = 0, tries = 0;
-    while (added < target && tries < target * 12) {
-      tries++;
-      // tipe yang menampilkan jaring pada soal: pakai bentuk jaring berbeda tiap nomor
-      var alt = null;
-      if (state.mode !== 'grid' && state.nets.length > 1) {
-        alt = state.nets[(added + tries) % state.nets.length].cells;
-      }
-      var q = makeQuiz(alt);
-      if (seen[quizKey(q)] && q.type !== 'toShape') continue;
-      seen[quizKey(q)] = true;
-      addToBank(q);
-      added++;
-    }
-    if (added < target) flash('Hanya ' + added + ' soal berbeda yang bisa dibuat dari isian ini.');
-  }
-
   function renderBank() {
     $('bank-count').textContent = state.bank.length;
     $('bank').innerHTML = state.bank.map(function (it, i) {
-      return '<div class="bank-item"><div>' + it.svg + '</div>' +
+      return '<div class="bank-item"><div>' + it.sheet + '</div>' +
         '<div><div class="bank-meta">Soal ' + (i + 1) + '<br>' + Art.esc(it.solid) + '</div>' +
         '<div class="bank-key">Kunci: ' + it.letter + '</div>' +
         '<button type="button" class="ghost danger" data-del="' + i + '">Hapus</button></div></div>';
@@ -562,9 +606,9 @@
   }
 
   function printBank() {
-    if (!state.bank.length) { flash('Bank soal masih kosong.'); return; }
+    if (!state.bank.length) { batchStatus('Bank soal masih kosong.', true); return; }
     var qs = state.bank.map(function (it, i) {
-      return '<div class="print-q"><b>' + (i + 1) + '.</b><br>' + it.svg + '</div>';
+      return '<div class="print-q"><b>' + (i + 1) + '.</b><br>' + it.sheet + '</div>';
     }).join('');
     var keys = '<div class="print-key"><h2>Kunci jawaban</h2><table>' +
       state.bank.map(function (it, i) {
@@ -573,6 +617,110 @@
       }).join('') + '</table></div>';
     $('print-area').innerHTML = qs + keys;
     window.print();
+  }
+
+  // ---------------------------------------------------------------- buat banyak soal
+
+  function batchStatus(pesan, error) {
+    var el = $('batch-status');
+    el.textContent = pesan || '';
+    el.className = 'status-line' + (error ? ' error' : '');
+  }
+
+  function jeda() { return new Promise(function (r) { setTimeout(r, 0); }); }
+
+  /**
+   * Buat sekaligus N soal ke bank. Bisa mengacak gambar sisi, bangun ruang,
+   * dan tipe soal supaya satu paket tidak monoton.
+   */
+  async function batchGenerate() {
+    var jumlah = Math.max(1, Math.min(200, parseInt($('batch-count').value, 10) || 10));
+    var variasi = $('batch-vary').value;
+    var tipeMode = $('batch-type').value;
+    var TIPE = ['toSolid', 'toNet', 'toShape', 'toFaces'];
+    var ids = Object.keys(Solids.CATALOG);
+
+    var asalSolid = state.solidId, asalParams = state.params;
+    var asalFaces = state.faces, asalNet = state.netIndex, asalTipe = $('qtype').value;
+
+    var bar = $('batch-progress');
+    bar.hidden = false; bar.max = jumlah; bar.value = 0;
+    $('btn-batch').disabled = true;
+    batchStatus('Membuat soal…');
+
+    try {
+      for (var i = 0; i < jumlah; i++) {
+        if (tipeMode === 'campur') $('qtype').value = TIPE[i % TIPE.length];
+
+        if (variasi === 'artSolid') {
+          setSolid(ids[Math.floor(Math.random() * ids.length)], null, false);
+          state.faces = randomFaces();
+        } else if (variasi === 'art') {
+          state.faces = randomFaces();
+        }
+        if (state.mode !== 'grid' && state.nets.length) {
+          state.netIndex = Math.floor(Math.random() * state.nets.length);
+        }
+
+        var alt = state.mode !== 'grid' && state.nets.length ? state.nets[state.netIndex].cells : null;
+        if (state.mode === 'grid' || !alt) alt = netCells();
+        addToBank(makeQuiz(alt), true);
+
+        bar.value = i + 1;
+        if (i % 4 === 3) { batchStatus('Membuat soal ' + (i + 1) + '/' + jumlah + '…'); await jeda(); }
+      }
+      batchStatus(jumlah + ' soal ditambahkan. Total di bank: ' + state.bank.length + '.');
+    } catch (e) {
+      batchStatus('Gagal membuat soal: ' + e.message, true);
+    } finally {
+      // kembalikan keadaan editor seperti semula
+      $('qtype').value = asalTipe;
+      $('difficulty').disabled = asalTipe !== 'toSolid';
+      setSolid(asalSolid, asalParams, false);
+      state.faces = asalFaces;
+      state.netIndex = Math.min(asalNet, Math.max(0, state.nets.length - 1));
+      bar.hidden = true;
+      $('btn-batch').disabled = false;
+      renderBank();
+      changed();
+    }
+  }
+
+  /** Unduh seluruh bank soal sebagai PDF: 4 halaman per soal. */
+  async function downloadPDF() {
+    if (!state.bank.length) { batchStatus('Bank soal masih kosong — tekan Generate dulu.', true); return; }
+    var bar = $('batch-progress');
+    bar.hidden = false; bar.max = state.bank.length; bar.value = 0;
+    $('btn-pdf').disabled = true;
+
+    try {
+      var soal = [];
+      for (var i = 0; i < state.bank.length; i++) {
+        var it = state.bank[i];
+        soal.push({
+          no: i + 1,
+          tipe: it.tipe,
+          tingkat: it.tingkat,
+          jawaban: it.letter,
+          pembahasan: it.pembahasan,
+          gambarSoal: await Raster.svgKePiksel(it.soalSvg, 2),
+          gambarPilihan: await Raster.svgKePiksel(it.pilihanSvg, 2)
+        });
+        bar.value = i + 1;
+        batchStatus('Menyiapkan halaman ' + (i + 1) + '/' + state.bank.length + '…');
+        if (i % 3 === 2) await jeda();
+      }
+      batchStatus('Memampatkan PDF…');
+      var blob = await Pdf.buat(soal, {});
+      Raster.unduhBlob(blob, 'soal-bangun-ruang-' + state.bank.length + 'soal.pdf');
+      batchStatus('PDF siap: ' + (state.bank.length * 4) + ' halaman dari ' + state.bank.length +
+        ' soal (' + (blob.size / 1048576).toFixed(1) + ' MB).');
+    } catch (e) {
+      batchStatus('Ekspor PDF gagal: ' + e.message, true);
+    } finally {
+      bar.hidden = true;
+      $('btn-pdf').disabled = false;
+    }
   }
 
   // ---------------------------------------------------------------- ekspor
@@ -637,7 +785,7 @@
     changed();
   }
 
-  function randomFill() {
+  function randomFaces() {
     var pool = [
       { type: 'dice', n: 1 }, { type: 'dice', n: 2 }, { type: 'dice', n: 3 },
       { type: 'dice', n: 4 }, { type: 'dice', n: 5 }, { type: 'dice', n: 6 },
@@ -653,11 +801,16 @@
       { type: 'text', text: 'L' }, { type: 'text', text: 'R' }, { type: 'text', text: '4' }
     ];
     var picked = Quiz.shuffle(pool);
-    var colored = Math.random() < 0.45;
-    state.faces = state.solid.faces.map(function (f, i) {
+    // "Warna tetap": hanya gambarnya yang diacak, warna tiap sisi dipertahankan
+    var tetap = $('keep-color').checked;
+    var colored = !tetap && Math.random() < 0.45;
+    return state.solid.faces.map(function (f, i) {
       var base = picked[i % picked.length];
+      var lama = state.faces[i];
       var fg = '#111111', bg = '#ffffff';
-      if (colored) {
+      if (tetap && lama && lama.art) {
+        fg = lama.art.fg; bg = lama.art.bg;
+      } else if (colored) {
         var c = COLORS[2 + Math.floor(Math.random() * 6)];
         if (base.type === 'blank') bg = c.v; else fg = c.v;
       } else if (base.type === 'blank' && Math.random() < 0.5) {
@@ -670,6 +823,10 @@
         rot: [0, 90, 180, 270][Math.floor(Math.random() * 4)]
       };
     });
+  }
+
+  function randomFill() {
+    state.faces = randomFaces();
     changed();
   }
 
@@ -837,9 +994,12 @@
     $('btn-png').addEventListener('click', downloadPNG);
     $('btn-svg').addEventListener('click', downloadSVG);
     $('btn-add-bank').addEventListener('click', function () { addToBank(); });
-    $('btn-add-many').addEventListener('click', function () { addManyToBank(5); });
+    $('btn-batch').addEventListener('click', batchGenerate);
+    $('btn-pdf').addEventListener('click', downloadPDF);
     $('btn-print').addEventListener('click', printBank);
-    $('btn-clear-bank').addEventListener('click', function () { state.bank = []; renderBank(); });
+    $('btn-clear-bank').addEventListener('click', function () {
+      state.bank = []; renderBank(); batchStatus('');
+    });
     $('bank').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-del]');
       if (!b) return;
