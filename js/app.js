@@ -518,12 +518,22 @@
         var sd = Solids.build(id);
         _pool.push({ solid: sd, nets: Solids.nets(sd, 8) });
       });
-      // Kolam bentuk tak beraturan dibuat cukup besar supaya untuk setiap bentuk
-      // selalu tersedia beberapa pembanding yang MIRIP — pengecoh yang mirip
-      // itulah yang membuat soal tidak bisa dijawab hanya dengan mencoret sekilas.
-      for (var b = 1; b <= 36; b++) {
+      // Kolam bentuk tak beraturan disusun BERSTRATA menurut jumlah sisi.
+      // Bentuk acak menyebar dari 5 sampai 11 sisi dengan sebaran yang jauh dari
+      // rata; kalau diambil apa adanya, jumlah sisi yang jarang muncul nyaris
+      // tidak punya pembanding dan pengecohnya terpaksa diambil dari bangun yang
+      // jelas berbeda — limas untuk soal prisma, misalnya.
+      var ember = {}, dapat = 0;
+      for (var b = 1; b <= 900 && dapat < 60; b++) {
         var sd = Solids.build('acak', { benih: b * 37 });
-        _pool.push({ solid: sd, nets: Solids.nets(sd, 8) });
+        var kunciSisi = sd.faces.length;
+        ember[kunciSisi] = ember[kunciSisi] || [];
+        if (ember[kunciSisi].length >= 8) continue;      // cukup 8 wakil per jumlah sisi
+        var jr = Solids.nets(sd, 8);
+        if (!jr.length) continue;
+        ember[kunciSisi].push(1);
+        _pool.push({ solid: sd, nets: jr });
+        dapat++;
       }
       // Beberapa balok dengan perbandingan berbeda. Tanpa ini, soal kubus hanya
       // punya satu pembanding dekat (balok baku) dan tiga sisanya terpaksa

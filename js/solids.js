@@ -337,8 +337,14 @@
     return true;
   }
 
-  /** Pangkas satu sudut menjadi bidang miring — memberi kesan bentuk "terpotong". */
-  function pangkasSudut(pts, rnd) {
+
+  /**
+   * Pangkas satu sudut siku sebesar tepat SATU petak, menghasilkan rusuk miring
+   * sepanjang akar 2 — lebih panjang daripada rusuk terpendek, jadi sisi tegak
+   * yang lahir darinya tidak pernah setipis garis. (Pemangkasan sembarang dulu
+   * sempat menghasilkan bilah miring yang tidak terbaca.)
+   */
+  function pangkasSatuPetak(pts, rnd) {
     var urut = pts.map(function (_, i) { return i; });
     for (var t = urut.length - 1; t > 0; t--) {
       var r = Math.floor(rnd() * (t + 1)), tmp = urut[t]; urut[t] = urut[r]; urut[r] = tmp;
@@ -348,15 +354,70 @@
       var a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n];
       var pa = Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2));
       var pc = Math.sqrt(Math.pow(c[0] - b[0], 2) + Math.pow(c[1] - b[1], 2));
-      if (pa < 0.9 || pc < 0.9) continue;
-      var f = 0.34 + rnd() * 0.22;
+      if (pa < 2 - 1e-9 || pc < 2 - 1e-9) continue;      // butuh ruang 2 petak di kedua rusuk
       var baru = pts.slice(0, i).concat([
-        [b[0] + (a[0] - b[0]) * f, b[1] + (a[1] - b[1]) * f],
-        [b[0] + (c[0] - b[0]) * f, b[1] + (c[1] - b[1]) * f]
+        [b[0] + (a[0] - b[0]) / pa, b[1] + (a[1] - b[1]) / pa],
+        [b[0] + (c[0] - b[0]) / pc, b[1] + (c[1] - b[1]) / pc]
       ], pts.slice(i + 1));
       if (poligonSederhana(baru)) return baru;
     }
     return pts;
+  }
+
+  /**
+   * Penampang cembung acak: trapesium, segiempat, segilima, atau segienam tak
+   * beraturan. Keluarga ini melengkapi poliomino yang semua sudutnya siku —
+   * bentuknya jelas berbeda tetapi tetap mudah dibaca karena cembung.
+   */
+  function penampangCembung(rnd) {
+    for (var coba = 0; coba < 40; coba++) {
+      var n = 4 + Math.floor(rnd() * 3);                 // 4..6 sisi
+      var pts = [], i;
+      for (i = 0; i < n; i++) {
+        var a = (i + 0.5) * 2 * Math.PI / n + (rnd() - 0.5) * (0.9 / n);
+        var jari = 0.72 + rnd() * 0.55;
+        pts.push([jari * Math.sin(a), jari * Math.cos(a)]);
+      }
+      // harus cembung dan rusuknya tidak ada yang jauh lebih pendek
+      var tanda = 0, cembung = true, mn = 9, mx = 0;
+      for (i = 0; i < n; i++) {
+        var p = pts[i], q = pts[(i + 1) % n], r = pts[(i + 2) % n];
+        var s = (q[0] - p[0]) * (r[1] - q[1]) - (q[1] - p[1]) * (r[0] - q[0]);
+        if (Math.abs(s) < 1e-6) { cembung = false; break; }
+        if (!tanda) tanda = s > 0 ? 1 : -1;
+        else if ((s > 0 ? 1 : -1) !== tanda) { cembung = false; break; }
+        var L = Math.sqrt(Math.pow(q[0] - p[0], 2) + Math.pow(q[1] - p[1], 2));
+        mn = Math.min(mn, L); mx = Math.max(mx, L);
+      }
+      if (!cembung || mn / mx <= 0.42) continue;
+      // kotak pembatasnya juga tidak boleh gepeng, supaya bangunnya tidak
+      // tampak seperti kartu tipis saat diekstrusi
+      var px = pts.map(function (q) { return q[0]; }), py = pts.map(function (q) { return q[1]; });
+      var lb = Math.max.apply(null, px) - Math.min.apply(null, px);
+      var tg = Math.max.apply(null, py) - Math.min.apply(null, py);
+      if (Math.min(lb, tg) / Math.max(lb, tg) < 0.55) continue;
+      return pts;
+    }
+    return null;
+  }
+
+  /**
+   * Limas terpancung: dua poligon sejajar berbeda ukuran, dihubungkan trapesium.
+   * Susunan sisinya sama dengan prisma (dua tutup + segelang sisi segiempat),
+   * jadi jaring pitanya pun terbentuk otomatis.
+   */
+  function frustumSolid(n, rBawah, rAtas, tinggi) {
+    var bawah = ring(n, rBawah, -tinggi / 2), atas = ring(n, rAtas, tinggi / 2);
+    var verts = bawah.concat(atas);
+    var faces = [
+      { v: bawah.map(function (_, i) { return i; }), name: 'Alas' },
+      { v: atas.map(function (_, i) { return n + i; }), name: 'Tutup' }
+    ];
+    for (var i = 0; i < n; i++) {
+      var j = (i + 1) % n;
+      faces.push({ v: [i, j, n + j, n + i], name: 'Sisi ' + (i + 1) });
+    }
+    return { verts: verts, faces: faces };
   }
 
   /**
@@ -368,6 +429,21 @@
   function irregularSolid(benih, opsi) {
     opsi = opsi || {};
     var rnd = mulberry32((benih | 0) || 1);
+
+    // Empat keluarga bentuk. Satu keluarga saja (poliomino bersudut siku)
+    // membuat seluruh bentuk terasa sekeluarga; keempatnya bersama memberi
+    // ragam yang jauh lebih lebar tanpa mengorbankan keterbacaan.
+    var jenis = rnd();
+    if (jenis > 0.86) {
+      var sisiF = 3 + Math.floor(rnd() * 4);            // 3..6 sisi alas
+      var rBawah = 0.6 + rnd() * 0.12;
+      return frustumSolid(sisiF, rBawah, rBawah * (0.35 + rnd() * 0.35), 0.75 + rnd() * 0.5);
+    }
+    if (jenis > 0.62) {
+      var cembung = penampangCembung(rnd);
+      if (cembung) return ekstrusi(cembung, 0.6 + Math.floor(rnd() * 5) * 0.22);
+    }
+
     var pts = null;
     var petak = 3 + Math.floor(rnd() * 5);              // 3..7 petak
 
@@ -393,13 +469,23 @@
       // masuk dalam batas ini.
       if (p.length < 6 || p.length > 8) continue;
       if (!poligonSederhana(p)) continue;
-      // Sudut tidak dipangkas miring: rusuk pendek menghasilkan sisi tegak setipis
-      // garis, dan pada jaring-jaring bentuk itu tidak terbaca lagi sebagai bangun
-      // datar. Semua rusuk penampang tetap kelipatan satu petak.
+      // sebagian dipangkas satu petak agar ada bidang miring, seperti balok bertakik
+      if (rnd() < 0.35) {
+        var dipangkas = pangkasSatuPetak(p, rnd);
+        if (poligonSederhana(dipangkas)) p = dipangkas;
+      }
       pts = p;
     }
     if (!pts) pts = [[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]];   // profil L cadangan
 
+    // Tebal dijaga sebanding dengan penampang (yang dinormalkan ke 1). Kalau
+    // terlalu tipis, pita jaring memanjang seperti penggaris dan kedua tutupnya
+    // tampak kecil sehingga bentuknya sulit dibayangkan.
+    return ekstrusi(pts, opsi.tebal || (0.7 + Math.floor(rnd() * 4) * 0.2));
+  }
+
+  /** Ekstrusi poligon datar (koordinat bebas) menjadi prisma, dinormalkan ke lebar 1. */
+  function ekstrusi(pts, tebal) {
     var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
     var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
     var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
@@ -408,10 +494,6 @@
       return [(p[0] - (x0 + x1) / 2) * k, (p[1] - (y0 + y1) / 2) * k];
     });
 
-    // Tebal dijaga sebanding dengan penampang (yang sudah dinormalkan ke 1).
-    // Kalau terlalu tipis, pita jaring memanjang seperti penggaris dan kedua
-    // tutupnya tampak kecil sehingga bentuknya sulit dibayangkan.
-    var tebal = opsi.tebal || (0.7 + Math.floor(rnd() * 4) * 0.2);
     var n = datar.length, verts = [], faces = [], i;
     for (i = 0; i < n; i++) verts.push([datar[i][0], -tebal / 2, datar[i][1]]);
     for (i = 0; i < n; i++) verts.push([datar[i][0], tebal / 2, datar[i][1]]);
@@ -940,12 +1022,35 @@
    * Mengembalikan { tutup:[a,b], gelang:[...urut keliling] } atau null.
    */
   function strukturPrisma(solid) {
-    var tutup = [], gelang = [];
-    solid.faces.forEach(function (f) {
-      if (f.sides === 4) gelang.push(f.index); else tutup.push(f.index);
-    });
-    if (tutup.length !== 2 || gelang.length < 3) return null;
-    if (solid.faces[tutup[0]].sides !== gelang.length) return null;
+    var n = solid.faces.length;
+    if (n < 5) return null;
+
+    // Ketetanggaan sisi
+    var tetanggaSisi = [];
+    for (var i = 0; i < n; i++) tetanggaSisi.push({});
+    solid.edges.forEach(function (e) { tetanggaSisi[e.a][e.b] = true; tetanggaSisi[e.b][e.a] = true; });
+
+    // Tutup dikenali dari sifatnya, BUKAN dari jumlah rusuknya: dua sisi yang
+    // tidak bersinggungan dan masing-masing bertetangga dengan SEMUA sisi lain.
+    // Menggolongkan lewat "bersisi empat" salah untuk penampang segiempat,
+    // karena di situ tutupnya pun bersisi empat.
+    var tutup = null;
+    for (i = 0; i < n && !tutup; i++) {
+      for (var j = i + 1; j < n; j++) {
+        if (tetanggaSisi[i][j]) continue;
+        var cocok = true;
+        for (var k = 0; k < n; k++) {
+          if (k === i || k === j) continue;
+          if (!tetanggaSisi[i][k] || !tetanggaSisi[j][k] || solid.faces[k].sides !== 4) { cocok = false; break; }
+        }
+        if (cocok) { tutup = [i, j]; break; }
+      }
+    }
+    if (!tutup) return null;
+
+    var gelang = [];
+    for (i = 0; i < n; i++) if (i !== tutup[0] && i !== tutup[1]) gelang.push(i);
+    if (gelang.length < 3) return null;
 
     // urutkan sisi tegak mengikuti keliling
     var tetangga = {};
@@ -1225,14 +1330,45 @@
     9: 'segisembilan', 10: 'segisepuluh', 11: 'segisebelas', 12: 'segidua belas'
   };
 
+  /** arah tiap rusuk poligon sisi, dinormalkan — untuk menguji sejajar & siku */
+  function arahRusuk(f) {
+    var p = facePoly2D(f), n = p.length, out = [];
+    for (var i = 0; i < n; i++) {
+      var a = p[i], b = p[(i + 1) % n];
+      var L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      out.push([(b[0] - a[0]) / L, (b[1] - a[1]) / L]);
+    }
+    return out;
+  }
+
   function faceShapeLabel(f) {
     var ls = edgeLengths(f).map(function (l) { return Math.round(l * 1000); });
     var beda = ls.filter(function (v, i) { return ls.indexOf(v) === i; }).length;
-    if (f.sides === 3) return beda === 1 ? 'segitiga sama sisi' : (beda === 2 ? 'segitiga sama kaki' : 'segitiga');
-    if (f.sides === 4 && !poligonCekung(f)) return beda === 1 ? 'persegi' : 'persegi panjang';
+    if (f.sides === 3) {
+      return beda === 1 ? 'segitiga sama sisi' : (beda === 2 ? 'segitiga sama kaki' : 'segitiga');
+    }
+
+    var d = arahRusuk(f), i;
+    if (f.sides === 4 && !poligonCekung(f)) {
+      // semua sudut siku -> persegi atau persegi panjang
+      var siku = true;
+      for (i = 0; i < 4; i++) {
+        if (Math.abs(d[i][0] * d[(i + 1) % 4][0] + d[i][1] * d[(i + 1) % 4][1]) > 1e-6) siku = false;
+      }
+      if (siku) return beda === 1 ? 'persegi' : 'persegi panjang';
+      // Penampang keluarga cembung bisa berupa trapesium atau jajar genjang;
+      // menyebutnya "persegi panjang" akan menyesatkan pada soal bangun datar.
+      function sejajar(a, b) { return Math.abs(d[a][0] * d[b][1] - d[a][1] * d[b][0]) < 1e-6; }
+      var pasang = (sejajar(0, 2) ? 1 : 0) + (sejajar(1, 3) ? 1 : 0);
+      if (pasang === 2) return beda === 1 ? 'belah ketupat' : 'jajar genjang';
+      if (pasang === 1) return 'trapesium';
+      return 'segiempat tak beraturan';
+    }
+
     var nama = NAMA_SEGI[f.sides] || 'segi-' + f.sides;
-    // penampang bangun tak beraturan bertakik — bukan poligon beraturan
-    return poligonCekung(f) ? nama + ' tak beraturan' : nama;
+    if (poligonCekung(f)) return nama + ' tak beraturan';
+    // poligon beraturan: semua rusuk sama panjang
+    return beda === 1 ? nama : nama + ' tak beraturan';
   }
 
   /** Poligon sebuah sisi dalam koordinat bidangnya sendiri (y ke bawah, siap digambar). */
@@ -1279,17 +1415,31 @@
     var p = {
       luas: s.faces.map(function (f) { return f.area; }).sort(function (x, y) { return y - x; }),
       rusuk: s.faces.map(function (f) { return f.sides; }).sort(function (x, y) { return y - x; }),
-      rusukUtama: 0
+      rusukUtama: 0, segitiga: 0, segiempat: 0
     };
     var maks = -1;
-    s.faces.forEach(function (f) { if (f.area > maks) { maks = f.area; p.rusukUtama = f.sides; } });
+    s.faces.forEach(function (f) {
+      if (f.area > maks) { maks = f.area; p.rusukUtama = f.sides; }
+      if (f.sides === 3) p.segitiga++;
+      else if (f.sides === 4) p.segiempat++;
+    });
     try { s._profilSisi = p; } catch (e) { /* objek beku */ }
     return p;
   }
 
   function kemiripan(a, b) {
-    var d = Math.abs(a.faces.length - b.faces.length) * 3;
     var pa = profilSisi(a), pb = profilSisi(b);
+
+    // Selisih jumlah sisi berbobot besar: bangun dengan jumlah sisi sama selalu
+    // lebih dulu dipertimbangkan daripada yang berbeda.
+    var d = Math.abs(a.faces.length - b.faces.length) * 12;
+
+    // Perbedaan KELUARGA: prisma didominasi segiempat, limas oleh segitiga.
+    // Tanpa suku ini limas segilima bisa terpilih sebagai pengecoh prisma
+    // bersisi enam hanya karena jumlah sisinya kebetulan sama — padahal
+    // jaring-jaringnya jelas berbeda dan penjawab langsung mencoretnya.
+    d += Math.abs(pa.segitiga - pb.segitiga) * 1.5 + Math.abs(pa.segiempat - pb.segiempat);
+
     var la = pa.luas, lb = pb.luas;
     var n = Math.max(la.length, lb.length), i;
     for (i = 0; i < n; i++) d += Math.abs((la[i] || 0) - (lb[i] || 0));

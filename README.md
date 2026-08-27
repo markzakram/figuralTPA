@@ -55,12 +55,22 @@ Selain kesembilan bangun baku, tersedia **bangun tak beraturan** yang dipakai
 Cocok untuk tipe B, C, dan D (tipe A butuh gambar sisi untuk membedakan orientasi,
 jadi pada paket campuran tipe A otomatis dialihkan).
 
-Bentuknya dibangkitkan, bukan digambar manual: sebuah **poliomino acak** (3–7 petak)
-ditelusuri tepinya menjadi penampang — menghasilkan profil L, V, T, U, atau balok
-bertakik — lalu diekstrusi. Tiap bentuk punya nomor benih; benih yang sama selalu
-menghasilkan bentuk yang sama, dan tombol *Acak bentuk* mengambil benih baru.
-Hasilnya sekitar **112 bangun berbeda** dari 53 penampang, masing-masing dengan
-~8 jaring-jaring, jadi ada ratusan pasangan bentuk × jaring yang bisa dipakai.
+Bentuknya dibangkitkan, bukan digambar manual, dari **empat keluarga**:
+
+| Keluarga | Cara dibuat | Hasilnya |
+|---|---|---|
+| poliomino | 3–7 petak yang menempel, tepinya ditelusuri jadi penampang, lalu diekstrusi | profil L, V, T, U, balok bertakik |
+| poliomino terpangkas | satu sudut siku dipotong tepat satu petak | bentuk dengan bidang miring |
+| penampang cembung | poligon cembung acak 4–6 sisi, lalu diekstrusi | prisma trapesium, segilima/segienam tak beraturan |
+| limas terpancung | dua poligon sejajar berbeda ukuran + sisi trapesium | limas terpotong, jaringnya berbentuk kipas |
+
+Satu keluarga saja membuat semua bentuk terasa sekeluarga. Keempatnya bersama
+menghasilkan **365 bangun berbeda dari 278 penampang**, masing-masing dengan
+~8 jaring-jaring — sekitar **2.850 pasangan bentuk × jaring**. Jumlah sisinya
+menyebar dari 5 sampai 11.
+
+Tiap bentuk punya nomor benih; benih yang sama selalu menghasilkan bentuk yang sama,
+dan tombol *Acak bentuk* mengambil benih baru.
 
 Tiga batasan menjaga agar bentuknya tetap **terbaca**, karena bentuk acak yang
 terlalu bebas menghasilkan gambar yang tidak bisa dibayangkan lipatannya:
@@ -68,6 +78,8 @@ terlalu bebas menghasilkan gambar yang tidak bisa dibayangkan lipatannya:
 | Batasan | Alasan |
 |---|---|
 | kotak pembatas penampang maksimal 4 petak, minimal 2 petak | penampang yang menjulur panjang membuat sisi tegaknya setipis garis |
+| penampang cembung: rusuk terpendek ≥ 0,42 kali terpanjang, kotak pembatas tidak gepeng | penampang gepeng membuat bangunnya tampak seperti kartu tipis |
+| pemangkasan sudut tepat satu petak | rusuk miringnya jadi sepanjang akar 2, lebih panjang daripada rusuk terpendek, jadi tidak pernah lahir bilah tipis |
 | penampang 6–8 rusuk | penampang berusuk 10+ berbentuk seperti sisir bergigi: di gambar 3D terbaca sebagai tumpukan bilah dan pita jaringnya memanjang jadi belasan kotak sempit |
 | tebal ekstrusi 0,7–1,3 kali penampang | kalau terlalu tipis, pita jaringnya memanjang seperti penggaris dan kedua tutupnya tampak kecil |
 

@@ -450,8 +450,10 @@
     for (var i = 0; i < pool.length && items.length < count; i++) {
       items.push({
         kind: 'shape', solid: pool[i], correct: false,
-        reason: 'itu ' + pool[i].name.toLowerCase() + ', jaring-jaringnya terdiri dari ' +
-          ringkasSisi(pool[i]) + ' — tidak cocok dengan gambar'
+        // Menyebut namanya saja tidak menolong ketika kunci dan pengecoh
+        // sama-sama "bangun tak beraturan" — yang membedakan susunan sisinya.
+        reason: 'jaring-jaringnya mesti terdiri dari ' + S.compositionText(pool[i]) +
+          ', sedangkan gambar pada soal ' + S.compositionText(target)
       });
     }
     if (items.length < count) {
@@ -465,7 +467,7 @@
     return {
       type: 'toShape', solid: target, faces: null, options: items,
       answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
-      warnings: warnings, describe: target.name.toLowerCase() + ' (' + ringkasSisi(target) + ')'
+      warnings: warnings, describe: target.name.toLowerCase() + ' (' + S.compositionText(target) + ')'
     };
   }
 
@@ -524,7 +526,11 @@
   function ringkasSisi(solid) {
     var by = {};
     solid.faces.forEach(function (f) { by[f.sides] = (by[f.sides] || 0) + 1; });
-    var nama = { 3: 'segitiga', 4: 'segiempat', 5: 'segilima', 6: 'segienam' };
+    var nama = {
+      3: 'segitiga', 4: 'segiempat', 5: 'segilima', 6: 'segienam',
+      7: 'segitujuh', 8: 'segidelapan', 9: 'segisembilan', 10: 'segisepuluh',
+      11: 'segisebelas', 12: 'segidua belas'
+    };
     return Object.keys(by).sort().map(function (k) {
       return by[k] + ' ' + (nama[k] || 'segi-' + k);
     }).join(' + ');
