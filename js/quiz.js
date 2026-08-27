@@ -157,6 +157,24 @@
   }
   function pick(arr, rnd) { return arr[Math.floor((rnd || Math.random)() * arr.length)]; }
 
+  /**
+   * Pilih tata letak jaring, mendahulukan yang sisi tegaknya berderet dalam satu
+   * pita. Pita terputus membentuk L atau T yang terbaca seperti bangun melengkung,
+   * padahal bangun ruangnya bersudut siku — pembaca jadi mencoretnya karena
+   * bentuknya, bukan karena membayangkan lipatannya.
+   */
+  function pilihJaring(nets, rnd) {
+    var lurus = nets.filter(function (j) { return j.lurus; });
+    return pick(lurus.length ? lurus : nets, rnd);
+  }
+
+  /** Urutan indeks tata letak: pita utuh lebih dulu, masing-masing diacak. */
+  function urutJaring(nets, rnd) {
+    var lurus = [], sisa = [];
+    nets.forEach(function (j, i) { (j.lurus ? lurus : sisa).push(i); });
+    return shuffle(lurus, rnd).concat(shuffle(sisa, rnd));
+  }
+
   /** Skor "enak dilihat": makin banyak sisi terisi dan berbeda, makin bagus. */
   function viewScore(solid, faces) {
     var keys = {}, filled = 0;
@@ -420,17 +438,27 @@
     // Ambil dari sekumpulan bentuk PALING MIRIP, lalu diacak. Kalau pengecohnya
     // jauh berbeda (mis. limas untuk soal prisma) penjawab bisa mencoretnya tanpa
     // berpikir; yang mirip memaksa mencocokkan penampang dan menghitung sisi.
+
+    // Jaring yang melengkung hanya dipasangkan dengan jaring yang melengkung.
+    // Bangun kotak berpengecoh jaring kipas langsung ketahuan tanpa perlu
+    // membayangkan lipatannya — dan sebaliknya.
+    var lengkungKunci = S.jaringMelengkung(solid);
+    var sekelas = kandidat.filter(function (k) {
+      return S.jaringMelengkung(k.solid) === lengkungKunci;
+    });
+    if (sekelas.length >= count - 1) kandidat = sekelas;
+
     var lain = shuffle(S.urutMirip(solid, kandidat).slice(0, Math.max(count * 2, 8)), rnd);
 
     var items = [{
-      kind: 'net', net: pick(nets, rnd), faces: solid.faces.map(function () { return { art: null, rot: 0 }; }),
+      kind: 'net', net: pilihJaring(nets, rnd), faces: solid.faces.map(function () { return { art: null, rot: 0 }; }),
       solidNet: solid, correct: true, reason: '', key: 'kunci'
     }];
 
     for (var i = 0; i < lain.length && items.length < count; i++) {
       var k = lain[i];
       items.push({
-        kind: 'net', net: pick(k.nets, rnd),
+        kind: 'net', net: pilihJaring(k.nets, rnd),
         faces: k.solid.faces.map(function () { return { art: null, rot: 0 }; }),
         solidNet: k.solid, correct: false, key: k.solid.id + ':' + i,
         alasan: { jenis: 'bentuk', susunan: S.compositionText(k.solid), susunanBenar: S.compositionText(solid) }
@@ -469,8 +497,9 @@
         warnings: ['Bangun ini belum punya jaring-jaring yang bisa digambar.'], describe: '' };
     }
 
-    // satu bentuk jaring berbeda untuk tiap pilihan, seperti soal aslinya
-    var layouts = shuffle(nets.map(function (_, i) { return i; }), rnd);
+    // satu bentuk jaring berbeda untuk tiap pilihan, seperti soal aslinya,
+    // dan pita utuh dipakai lebih dulu supaya tidak ada yang tampak membelok
+    var layouts = urutJaring(nets, rnd);
     var pool = [];
     for (var i = 0; i < count; i++) pool.push(layouts[i % layouts.length]);
 

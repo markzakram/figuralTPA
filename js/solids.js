@@ -440,10 +440,12 @@
     // membuat seluruh bentuk terasa sekeluarga; keempatnya bersama memberi
     // ragam yang jauh lebih lebar tanpa mengorbankan keterbacaan.
     var jenis = rnd();
-    // Sebagian prisma dibuat miring agar siluetnya tidak selalu tegak. Kemiringan
-    // ditahan kecil: geseran besar membuat pita jaringnya menggunting menyerong
-    // sehingga sulit dibaca, dan bangunnya sendiri tampak nyaris rebah.
-    var geser = rnd() < 0.28 ? [(rnd() - 0.5) * 0.3, (rnd() - 0.5) * 0.3] : null;
+    // Prisma miring sudah tidak dipakai. Kemiringan membuat setiap sisi tegak
+    // menjadi jajar genjang dengan sudut yang berbeda-beda, sehingga pita
+    // jaringnya menyerong 9-28 derajat: di kertas terbaca sebagai jaring
+    // melengkung padahal bangunnya bersudut siku. Ragam siluet tidak sepadan
+    // dengan hilangnya keterbacaan itu.
+    var geser = null;
 
     // Bobot keluarga: poliomino ~46%, penampang cembung ~36%, limas terpancung ~18%.
     // Poliomino sengaja tidak lagi mayoritas mutlak — sebelumnya 62% dan seluruh
@@ -454,11 +456,11 @@
       // hampir penuh — jaringnya sah tetapi terlihat kusut dan sulit dibayangkan.
       var sisiF = 4 + Math.floor(rnd() * 3);            // 4..6 sisi alas
       var rBawah = 0.6 + rnd() * 0.12;
-      return frustumSolid(sisiF, rBawah, rBawah * (0.55 + rnd() * 0.25), 0.55 + rnd() * 0.35);
+      return frustumSolid(sisiF, rBawah, rBawah * (0.68 + rnd() * 0.2), 0.55 + rnd() * 0.35);
     }
     if (jenis > 0.46) {
       var cembung = penampangCembung(rnd);
-      if (cembung) return ekstrusi(cembung, 0.42 + Math.floor(rnd() * 5) * 0.13, geser);
+      if (cembung) return ekstrusi(cembung, 0.40 + Math.floor(rnd() * 7) * 0.105, geser);
     }
 
     var pts = null;
@@ -501,7 +503,7 @@
     // Tebal ditahan di bawah lebar penampang. Sebelumnya bisa mencapai 1,3 kali
     // penampang sehingga bangunnya menjulang seperti tiang; bentuk rujukan justru
     // lebih rebah — lebarnya melebihi tingginya.
-    return ekstrusi(pts, opsi.tebal || (0.42 + Math.floor(rnd() * 4) * 0.14), geser);
+    return ekstrusi(pts, opsi.tebal || (0.40 + Math.floor(rnd() * 6) * 0.115), geser);
   }
 
   /**
@@ -1149,7 +1151,7 @@
 
     var out = [], seen = {}, jml = solid.faces.length, g = st.gelang.length;
 
-    function coba(pohon) {
+    function coba(pohon, lurus) {
       if (out.length >= limit) return;
       if (pohon.some(function (e) { return !e; })) return;
       if (!isSpanningTree(jml, pohon)) return;
@@ -1160,7 +1162,7 @@
       if (!u.ok) return;
       var cells = u.cells, bo = boundsOf(cells);
       if (bo.h > bo.w + 1e-9) { cells = rotateCells(cells, 90); bo = boundsOf(cells); }
-      out.push({ cells: cells, bounds: bo, tree: pohon.slice(), key: key });
+      out.push({ cells: cells, bounds: bo, tree: pohon.slice(), key: key, lurus: !!lurus });
     }
 
     var a, b, k;
@@ -1170,7 +1172,7 @@
         coba(pita.concat([
           rusukAntar[st.tutup[0] + '-' + st.gelang[a]],
           rusukAntar[st.tutup[1] + '-' + st.gelang[b]]
-        ]));
+        ]), true);
       }
     }
 
@@ -1204,6 +1206,14 @@
     }
     return out.length ? out : null;
   }
+
+  /**
+   * Jaring "lurus": sisi tegaknya berderet dalam satu pita, jadi bentuknya
+   * seperti bangun datar memanjang. Jaring pita TERPUTUS membentuk L atau T,
+   * dan pada bangun bersudut siku pun terlihat membelok — padahal bangunnya
+   * sendiri tidak menirus. Yang lurus didahulukan saat memilih tata letak.
+   */
+  function netLurus(net) { return !!(net && net.lurus); }
 
   function nets(solid, limit) {
     limit = limit || 60;
@@ -1357,11 +1367,35 @@
       var total = 0, min = Infinity;
       for (i = 0; i < terbaca.length; i++) { total += terbaca[i]; min = Math.min(min, terbaca[i]); }
       areas = terbaca;
-      // Keseimbangan diutamakan: tanpa itu, penilaian justru memilih tampilan
-      // yang membuat sisi terbesar mendominasi sampai sisi lain setipis garis —
-      // prisma segitiga jadi terlihat seperti kartu terlipat. Bonus sisi terbesar
-      // dibuat jenuh di 0,5 supaya tidak bisa "dibeli" dengan mengorbankan yang lain.
-      return areas.length + 1.2 * (min / total) + 0.5 * Math.min(luasUtama / total, 0.5);
+
+      // Siluet: sudut pandang yang membuat bangunnya memanjang seperti pita
+      // ditolak. Bangun bertakik zigzag punya sudut pandang yang memamerkan
+      // tujuh sisi sekaligus, tetapi semuanya jadi bilah tipis berderet dan
+      // bentuk ruangnya justru hilang — dari sudut lain yang hanya
+      // memperlihatkan empat sisi, bangunnya langsung terbaca.
+      var xMin = Infinity, xMaks = -Infinity, yMin = Infinity, yMaks = -Infinity;
+      for (i = 0; i < solid.verts.length; i++) {
+        var q = matVec(M, solid.verts[i]);
+        if (q[0] < xMin) xMin = q[0];
+        if (q[0] > xMaks) xMaks = q[0];
+        if (q[1] < yMin) yMin = q[1];
+        if (q[1] > yMaks) yMaks = q[1];
+      }
+      var sisiPanjang = Math.max(xMaks - xMin, yMaks - yMin);
+      var sisiPendek = Math.max(1e-6, Math.min(xMaks - xMin, yMaks - yMin));
+      var dendaSiluet = Math.max(0, sisiPanjang / sisiPendek - 2.1) * 0.9;
+
+      // Jumlah sisi tetap dihargai tetapi tidak lagi mendominasi: dulu bobotnya
+      // 1 per sisi sedangkan seluruh suku keseimbangan paling banter 1,2 sehingga
+      // menambah satu bilah tipis selalu menang. min/rata-rata bernilai 1 kalau
+      // semua sisi sama luas dan mendekati 0 kalau ada yang jauh lebih tipis,
+      // jadi ukurannya tidak ikut membesar bersama jumlah sisi.
+      var seimbang = terbaca.length ? (min / (total / terbaca.length)) : 0;
+      // Imbalan jumlah sisi dijenuhkan di lima: lebih dari itu tidak menambah
+      // kejelasan, sedangkan tampilan yang memamerkan tujuh bilah tipis sama
+      // lebar justru lolos dari suku keseimbangan karena semuanya sama tipis.
+      return 0.62 * Math.min(areas.length, 5) + 1.5 * seimbang +
+        0.5 * Math.min(luasUtama / total, 0.5) - dendaSiluet;
     }
 
     var bagus = [];        // semua pose yang nilainya mendekati terbaik
@@ -1559,6 +1593,29 @@
     return p;
   }
 
+  /**
+   * Apakah jaring-jaring bangun ini melengkung? Pita sisi tegak sebuah prisma
+   * tegak MAUPUN prisma miring membuka lurus karena semua rusuk lipatnya
+   * sejajar; yang membuka melengkung seperti kipas hanyalah limas terpancung,
+   * sebab kedua tutupnya berbeda ukuran. Nilainya 0 untuk jaring lurus dan
+   * makin besar makin melengkung.
+   */
+  function ketirusan(solid) {
+    if (solid._ketirusan !== undefined) return solid._ketirusan;
+    var nilai = 0;
+    var p = strukturPrisma(solid);
+    if (p) {
+      var a2 = solid.faces[p.tutup[0]].area, b2 = solid.faces[p.tutup[1]].area;
+      var besar = Math.max(a2, b2), kecil = Math.min(a2, b2);
+      if (besar > EPS) nilai = 1 - Math.sqrt(kecil / besar);
+    }
+    try { solid._ketirusan = nilai; } catch (e) { /* objek beku */ }
+    return nilai;
+  }
+
+  /** Bangun yang jaring-jaringnya membuka melengkung. */
+  function jaringMelengkung(solid) { return ketirusan(solid) > 0.02; }
+
   function kemiripan(a, b) {
     var pa = profilSisi(a), pb = profilSisi(b);
 
@@ -1584,6 +1641,12 @@
 
     // jumlah rusuk pada sisi terbesar = bentuk penampang
     d += Math.abs(pa.rusukUtama - pb.rusukUtama) * 0.8;
+
+    // Bangun menirus dan bangun tegak tidak boleh berpasangan: jaring yang
+    // satu membuka melengkung seperti kipas, yang lain lurus, sehingga
+    // penjawab bisa mencoretnya tanpa membayangkan lipatannya sama sekali.
+    if (jaringMelengkung(a) !== jaringMelengkung(b)) d += 9;
+    d += Math.abs(ketirusan(a) - ketirusan(b)) * 6;
 
     // susunan bangun datar yang sama membuat keduanya makin sulit dibedakan
     if (compositionKey(a) === compositionKey(b)) d -= 0.5;
@@ -1614,9 +1677,10 @@
     blankFaces: blankFaces, boundsOf: boundsOf, rotateCells: rotateCells, shapeKey: shapeKey,
     composition: composition, compositionKey: compositionKey, compositionText: compositionText,
     kemiripan: kemiripan, urutMirip: urutMirip,
+    ketirusan: ketirusan, jaringMelengkung: jaringMelengkung,
     faceShapeLabel: faceShapeLabel, facePoly2D: facePoly2D,
     symmetries: symmetries, isSpanningTree: isSpanningTree, treeKey: treeKey,
-    polyOverlap: polyOverlap, unfold: unfold,
+    polyOverlap: polyOverlap, unfold: unfold, netLurus: netLurus,
     irregularSolid: irregularSolid, mulberry32: mulberry32, strukturPrisma: strukturPrisma,
     poligonSederhana: poligonSederhana, signedVolume: signedVolume,
     anglesToMatrix: anglesToMatrix, choosePose: choosePose, orthonormalize: orthonormalize,

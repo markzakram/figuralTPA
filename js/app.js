@@ -512,6 +512,22 @@
    * Dipakai sebagai sumber pengecoh untuk tipe B (polos), C, dan D. Dihitung
    * sekali lalu disimpan karena mencari jaring-jaringnya memakan waktu.
    */
+  /**
+   * Indeks tata letak jaring acak, mendahulukan pita utuh. Pita terputus
+   * membentuk L atau T yang terbaca seperti bangun melengkung padahal bangun
+   * ruangnya bersudut siku.
+   */
+  function indeksJaringAcak(kecuali) {
+    var lurus = [], sisa = [];
+    state.nets.forEach(function (j, i) {
+      if (i === kecuali) return;
+      (j.lurus ? lurus : sisa).push(i);
+    });
+    var kolam = lurus.length ? lurus : sisa;
+    if (!kolam.length) return state.netIndex;
+    return kolam[Math.floor(Math.random() * kolam.length)];
+  }
+
   function poolBentuk() {
     if (!_pool) {
       _pool = [];
@@ -810,7 +826,7 @@
         // tidak berlaku — dialihkan ke tipe yang menguji bentuk
         if (state.solid.polos && $('qtype').value === 'toSolid') $('qtype').value = 'toNet';
         if (state.mode !== 'grid' && state.nets.length) {
-          state.netIndex = Math.floor(Math.random() * state.nets.length);
+          state.netIndex = indeksJaringAcak();
         }
 
         var alt = state.mode !== 'grid' && state.nets.length ? state.nets[state.netIndex].cells : null;
@@ -1044,9 +1060,7 @@
 
     $('btn-net-random').addEventListener('click', function () {
       if (state.mode === 'grid' || state.nets.length < 2) return;
-      var i = state.netIndex;
-      while (i === state.netIndex) i = Math.floor(Math.random() * state.nets.length);
-      state.netIndex = i;
+      state.netIndex = indeksJaringAcak(state.netIndex);
       changed();
       var act = $('gallery').querySelector('.net-thumb.active');
       if (act) act.scrollIntoView({ block: 'nearest' });

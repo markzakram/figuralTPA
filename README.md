@@ -64,10 +64,9 @@ Bentuknya dibangkitkan, bukan digambar manual, dari **empat keluarga**:
 | penampang cembung | poligon cembung acak 4–6 sisi, lalu diekstrusi | prisma trapesium, segilima/segienam tak beraturan |
 | limas terpancung | dua poligon sejajar berbeda ukuran + sisi trapesium | limas terpotong, jaringnya berbentuk kipas |
 
-Sebagian prisma dibuat **miring** (tutup atas digeser) supaya siluetnya tidak
-selalu tegak. Keempat keluarga bersama menghasilkan **500 bangun berbeda dari
-369 penampang**, masing-masing dengan ~8 jaring-jaring — sekitar **3.980 pasangan
-bentuk × jaring**. Jumlah sisinya menyebar dari 6 sampai 11.
+Keempat keluarga bersama menghasilkan **471 bangun berbeda dari 365 penampang**,
+masing-masing dengan ~8 jaring-jaring — sekitar **3.740 pasangan bentuk × jaring**.
+Jumlah sisinya menyebar dari 6 sampai 11.
 
 **Garis lipatan digambar putus-putus.** Rusuk yang dimiliki dua sisi adalah garis
 lipatan; yang hanya dimiliki satu sisi adalah tepi luar. Karena itu rusuk digambar
@@ -78,12 +77,12 @@ pada gambar jaring-jaring yang lazim.
 penampang (median tinggi:lebar 0,68; tidak ada yang melebihi 1,0). Sebelumnya tebal
 bisa 1,3 kali penampang dan bangunnya terlihat seperti tiang.
 
-**Tata letak jaring tidak lagi seragam.** Selain pita lurus, sebagian jaring memakai
-pita *terputus*: sisi tegak dipecah jadi dua deret pendek yang menempel pada tutup
-berbeda, menghasilkan jaring berbentuk L, T, atau Y. Porsinya dibatasi sepertiga —
-kalau mendominasi, jaringnya bercabang ke mana-mana dan sulit dibayangkan. Sudut
-pandang 3D juga dipilih acak (berbenih) di antara pose yang sama bagusnya, supaya
-seratus soal tidak tampak dari sudut yang sama.
+**Tata letak jaringnya bervariasi lewat titik tempel tutupnya.** Kedua tutup bisa
+menempel pada sisi tegak mana saja, dan tiap bentuk punya 6–12 tata letak pita utuh
+yang berbeda. Tata letak *pita terputus* (jaring L/T) masih dibangkitkan tetapi
+selalu dipakai paling akhir — lihat "Jaring tidak melengkung" di bawah. Sudut pandang
+3D dipilih acak (berbenih) di antara pose yang sama bagusnya, supaya seratus soal
+tidak tampak dari sudut yang sama.
 
 Tiap bentuk punya nomor benih; benih yang sama selalu menghasilkan bentuk yang sama,
 dan tombol *Acak bentuk* mengambil benih baru.
@@ -97,7 +96,7 @@ terlalu bebas menghasilkan gambar yang tidak bisa dibayangkan lipatannya:
 | penampang cembung: rusuk terpendek ≥ 0,42 kali terpanjang, kotak pembatas tidak gepeng | penampang gepeng membuat bangunnya tampak seperti kartu tipis |
 | pemangkasan sudut tepat satu petak | rusuk miringnya jadi sepanjang akar 2, lebih panjang daripada rusuk terpendek, jadi tidak pernah lahir bilah tipis |
 | penampang 6–8 rusuk | penampang berusuk 10+ berbentuk seperti sisir bergigi: di gambar 3D terbaca sebagai tumpukan bilah dan pita jaringnya memanjang jadi belasan kotak sempit |
-| tebal ekstrusi 0,7–1,3 kali penampang | kalau terlalu tipis, pita jaringnya memanjang seperti penggaris dan kedua tutupnya tampak kecil |
+| tebal ekstrusi 0,40–1,03 kali penampang | kalau terlalu tipis, pita jaringnya memanjang seperti penggaris dan kedua tutupnya tampak kecil |
 
 **Jaring-jaringnya memakai tata letak pita.** Sisi tegak dibuka lurus menjadi satu
 pita mendatar, lalu kedua tutup ditempelkan pada sisi tegak yang dipilih — bentuk
@@ -106,6 +105,24 @@ lain) menghasilkan jaring yang menjalar menyerong dan sangat sulit dibayangkan
 lipatannya. Bangun baku tetap dicacah lengkap agar jumlah jaring bakunya tidak
 berkurang. Sudut pandang 3D-nya juga mengutamakan sisi terbesar — yaitu penampangnya —
 supaya profilnya langsung terbaca.
+
+### Jaring tidak melengkung kalau bangunnya tidak menirus
+
+Pita sisi tegak boleh melengkung **hanya** kalau bangunnya memang menirus. Tiga hal
+yang dulu membuat jaring bangun bersudut siku pun terbaca membelok:
+
+| Penyebab | Ukurannya | Tindakan |
+|---|---|---|
+| tata letak **pita terputus** (jaring L/T) | pita berbelok 15–25° | pita utuh selalu didahulukan; setiap bentuk punya minimal 6 tata letak pita utuh, cukup untuk lima pilihan |
+| **prisma miring** (sisi tegaknya jajar genjang) | pita menyerong 9–28° | kemiringan dihapus — tiap sisi tegak mendapat sudut serong yang berbeda sehingga pitanya berkelok |
+| **limas terpancung** | kipas 60° (maks 89°) | ketirusan dirapatkan ke 0,68–0,88 sehingga kipasnya tinggal 41° (maks 73°) |
+
+Kelengkungan yang tersisa hanya milik limas terpancung, dan di situ memang tidak
+terhindarkan: selimut limas terpancung sungguh-sungguh membuka menjadi kipas.
+Karena itu **jaring melengkung tidak pernah dicampur dengan jaring lurus dalam satu
+soal** — bangun kotak yang berpengecoh jaring kipas bisa dicoret tanpa membayangkan
+lipatannya sama sekali, dan sebaliknya. Diperiksa `campur.js`: dari 360 soal polos,
+0% yang tercampur.
 
 Tiga bagian mesin harus diperbaiki agar bangun **cekung** tertangani benar:
 
@@ -263,7 +280,12 @@ lingkaran yang diputar 120° akan dikira gambar yang berbeda dan bisa melahirkan
 
 **Sudut pandang otomatis.** Untuk prisma dan limas, program memindai ratusan sudut lalu
 memilih yang memperlihatkan sisi terbanyak dengan luas paling seimbang, sehingga tidak
-ada sisi yang tampak setipis garis.
+ada sisi yang tampak setipis garis. Dua penjaga tambahan mencegah bangunnya tampak
+gepeng: imbalan jumlah sisi **dijenuhkan di lima**, dan sudut pandang yang membuat
+siluetnya memanjang lebih dari 2,1 kali kena denda. Tanpa keduanya, bangun bertakik
+zigzag terpilih dari sudut yang memamerkan tujuh sisi sekaligus — semuanya menjadi
+bilah tipis berderet dan bentuk ruangnya justru hilang. Setelah diperbaiki, tidak ada
+satu pun dari 200 bentuk acak yang siluetnya melewati rasio 2,1 (median 1,24).
 
 **Ambang keterbacaan.** Sebuah sisi baru dihitung "terlihat" kalau luas bayangannya
 minimal **0,30 kali** sisi terlebar (`AMBANG_TAMPAK` di `solids.js`). Angka ini
