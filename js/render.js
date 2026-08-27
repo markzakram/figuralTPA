@@ -116,9 +116,13 @@
       return { f: f, dalam: S.dot(S.matVec(M, f.center), proj.view) };
     }).sort(function (a, b) { return a.dalam - b.dalam; });
 
-    tampak.forEach(function (item) {
+    var segi = tampak.map(function (item) {
+      return item.f.poly.map(function (v) { return proj.project(S.matVec(M, v)); });
+    });
+
+    tampak.forEach(function (item, k) {
       var f = item.f;
-      var poly = f.poly.map(function (v) { return proj.project(S.matVec(M, v)); });
+      var poly = segi[k];
       var o = proj.project(S.matVec(M, f.box.o));
       var pu = proj.project(S.matVec(M, S.add(f.box.o, f.box.U)));
       var pv = proj.project(S.matVec(M, S.add(f.box.o, f.box.V)));
@@ -129,15 +133,36 @@
       if (piece.defs) defs.push(piece.defs);
     });
 
-    return (defs.length ? '<defs>' + defs.join('') + '</defs>' : '') + body.join('');
+    // nomor sisi untuk pembahasan: di luar bayangan bangun, digambar paling akhir
+    var nomor = '';
+    if (opts.nomor) {
+      var rr = opts.ukuranNomor || 11;
+      var titik = [];
+      tampak.forEach(function (item, k) {
+        var no = opts.nomor[item.f.index];
+        if (!no) return;
+        var t = titikNomor(segi[k], segi, rr);
+        t.no = no;
+        titik.push(t);
+      });
+      nomor = gambarNomor(renggangkan(titik, rr, segi), rr);
+    }
+
+
+    return (defs.length ? '<defs>' + defs.join('') + '</defs>' : '') + body.join('') + nomor;
   }
 
   /** Tampilan baku untuk pilihan jawaban: pose bangun + proyeksi khasnya. */
   function solidView(sd, faces, size, opts) {
+    opts = opts || {};
     var proj = projectionFor(sd, size);
+    var svg = solid(sd, faces, S.poseMatrix(sd), proj, opts);
+    if (!opts.nomor) return { svg: svg, width: proj.width, height: proj.height };
+    // nomor berada di luar bayangan bangun, jadi bingkainya diberi tepi
+    var m = (opts.ukuranNomor || 11) * 2.6;
     return {
-      svg: solid(sd, faces, S.poseMatrix(sd), proj, opts || {}),
-      width: proj.width, height: proj.height
+      svg: '<g transform="translate(' + num(m) + ',' + num(m) + ')">' + svg + '</g>',
+      width: proj.width + m * 2, height: proj.height + m * 2
     };
   }
 
@@ -171,7 +196,8 @@
    */
   function net(cells, faces, scale, opts) {
     opts = opts || {};
-    var pad = opts.pad || 0;
+    // nomor duduk di luar petak, jadi bingkai gambar perlu dilebarkan
+    var pad = opts.pad || (opts.nomor ? (opts.ukuranNomor || 11) * 2.6 : 0);
     var b = S.boundsOf(cells);
     var prefix = 'n' + (++uid) + '_';
     var body = [], defs = [];
@@ -190,10 +216,12 @@
       else rusuk[k] = { a: a, b: b2, n: 1 };
     }
 
-    cells.forEach(function (c) {
-      var titik = c.poly.map(P);
-      var piece = facePiece(titik, { o: P(c.box.o), U: D(c.box.U), V: D(c.box.V) },
-        faces && faces[c.face], opts, prefix + c.face, true);
+    var segi = cells.map(function (c) { return c.poly.map(P); });
+
+    cells.forEach(function (c, ci) {
+      var titik = segi[ci];
+      var box = { o: P(c.box.o), U: D(c.box.U), V: D(c.box.V) };
+      var piece = facePiece(titik, box, faces && faces[c.face], opts, prefix + c.face, true);
       body.push('<g data-face="' + c.face + '" class="net-face">' + piece.body + '</g>');
       if (piece.defs) defs.push(piece.defs);
       for (var i = 0; i < titik.length; i++) catat(titik[i], titik[(i + 1) % titik.length]);
@@ -218,8 +246,23 @@
         '" stroke-linecap="butt">' + lipat.join('') + '</g>';
     }
 
+    // nomor sisi: di luar petaknya, tidak menutupi gambar mana pun
+    var nomor = '';
+    if (opts.nomor) {
+      var rn = opts.ukuranNomor || 11;
+      var daftar = [];
+      cells.forEach(function (c, ci) {
+        var no = opts.nomor[c.face];
+        if (!no) return;
+        var t = titikNomor(segi[ci], segi, rn);
+        t.no = no;
+        daftar.push(t);
+      });
+      nomor = gambarNomor(renggangkan(daftar, rn, segi), rn);
+    }
+
     return {
-      svg: (defs.length ? '<defs>' + defs.join('') + '</defs>' : '') + body.join('') + garis,
+      svg: (defs.length ? '<defs>' + defs.join('') + '</defs>' : '') + body.join('') + garis + nomor,
       width: b.w * scale + pad * 2,
       height: b.h * scale + pad * 2
     };
@@ -276,6 +319,167 @@
   }
 
   // ---------------------------------------------------------------- pembungkus
+
+  /** Titik di dalam poligon 2D? (pancaran sinar, sah juga untuk poligon cekung) */
+  function didalam(poly, x, y) {
+    var masuk = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) masuk = !masuk;
+    }
+    return masuk;
+  }
+
+  /** Jarak titik ke poligon; 0 kalau titiknya di dalam. */
+  function jarakKePoly(x, y, poly) {
+    if (didalam(poly, x, y)) return 0;
+    var d = Infinity;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var ax = poly[j][0], ay = poly[j][1];
+      var ex = poly[i][0] - ax, ey = poly[i][1] - ay;
+      var L = ex * ex + ey * ey;
+      var t = L ? ((x - ax) * ex + (y - ay) * ey) / L : 0;
+      t = Math.max(0, Math.min(1, t));
+      d = Math.min(d, Math.hypot(x - (ax + t * ex), y - (ay + t * ey)));
+    }
+    return d;
+  }
+
+  /**
+   * Tempat bulatan nomor: DI LUAR sisinya, menempel pada salah satu tepi luar,
+   * dengan garis penunjuk pendek. Ditaruh di dalam sisi, bulatan sebesar ini pasti
+   * menimpa simbol pada sisi yang kecil — dan simbol itulah yang harus terbaca.
+   *
+   * @param poly    poligon sisi yang dinomori (koordinat layar)
+   * @param semua   semua poligon pada gambar, untuk memastikan bulatan tidak
+   *                jatuh menimpa sisi tetangga
+   */
+  function titikNomor(poly, semua, r) {
+    var cx = 0, cy = 0, i;
+    for (i = 0; i < poly.length; i++) { cx += poly[i][0]; cy += poly[i][1]; }
+    cx /= poly.length; cy /= poly.length;
+
+    // seluruh bulatan harus bebas, bukan hanya titik tengahnya
+    function bebasPenuh(x, y) {
+      for (var k = 0; k < semua.length; k++) {
+        if (jarakKePoly(x, y, semua[k]) < r * 0.98) return false;
+      }
+      return true;
+    }
+
+    var terbaik = null, skor = -1;
+    for (i = 0; i < poly.length; i++) {
+      var a = poly[i], b = poly[(i + 1) % poly.length];
+      var mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+      var ex = b[0] - a[0], ey = b[1] - a[1];
+      var pj = Math.hypot(ex, ey);
+      if (pj < 1e-6) continue;
+      var nx = -ey / pj, ny = ex / pj;
+      if (nx * (mx - cx) + ny * (my - cy) < 0) { nx = -nx; ny = -ny; }   // arahkan keluar
+      var jarak = [1.45, 1.15, 1.9, 2.4, 3.0];
+      for (var j = 0; j < jarak.length; j++) {
+        var d = r * jarak[j];
+        var x = mx + nx * d, y = my + ny * d;
+        if (!bebasPenuh(x, y)) continue;
+        // tepi yang panjang lebih jelas menunjuk sisinya
+        var nilai = pj - j * r * 0.6;
+        if (nilai > skor) { skor = nilai; terbaik = { x: x, y: y, ax: mx, ay: my, kx: nx, ky: ny }; }
+        break;
+      }
+    }
+    if (terbaik) return terbaik;
+
+    // Sisi yang terkepung sisi lain: nomornya dibawa keluar dari seluruh gambar
+    // mengikuti sinar dari pusat gambar, dengan garis penunjuk yang lebih panjang.
+    var gx = 0, gy = 0, jml = 0;
+    semua.forEach(function (p) {
+      p.forEach(function (v) { gx += v[0]; gy += v[1]; jml++; });
+    });
+    if (jml) { gx /= jml; gy /= jml; }
+    var vx = cx - gx, vy = cy - gy, pj2 = Math.hypot(vx, vy);
+    if (pj2 < 1e-6) { vx = 0; vy = -1; } else { vx /= pj2; vy /= pj2; }
+    for (var s = 1; s <= 40; s++) {
+      var lx = cx + vx * r * 0.6 * s, ly = cy + vy * r * 0.6 * s;
+      if (bebasPenuh(lx, ly)) return { x: lx, y: ly, ax: cx, ay: cy, kx: vx, ky: vy };
+    }
+    return { x: cx, y: cy, ax: cx, ay: cy };
+  }
+
+  /**
+   * Renggangkan bulatan yang berdempetan. Setiap dorongan dibatalkan kalau
+   * membuat bulatan itu naik ke atas gambar — bebas dari gambar lebih penting
+   * daripada jarak antar nomor.
+   */
+  function renggangkan(daftar, r, semua) {
+    function bebas(t) {
+      for (var m = 0; m < semua.length; m++) {
+        if (jarakKePoly(t.x, t.y, semua[m]) < r * 0.98) return false;
+      }
+      return true;
+    }
+    function jauhkan(t, d) {
+      if (t.kx === undefined) return;
+      var x = t.x, y = t.y;
+      t.x += t.kx * d; t.y += t.ky * d;
+      if (!bebas(t)) { t.x = x; t.y = y; }
+    }
+    var awalBebas = daftar.map(bebas);
+    var batas = r * 2.15;
+    for (var putaran = 0; putaran < 24; putaran++) {
+      var geser = false;
+      for (var i = 0; i < daftar.length; i++) {
+        for (var j = i + 1; j < daftar.length; j++) {
+          var a = daftar[i], b = daftar[j];
+          var dx = b.x - a.x, dy = b.y - a.y;
+          var d = Math.hypot(dx, dy);
+          if (d >= batas || d < 1e-9) continue;
+          var dorong = (batas - d) / 2;
+          dx /= d; dy /= d;
+          var ax = a.x, ay = a.y, bx = b.x, by = b.y;
+          a.x -= dx * dorong; a.y -= dy * dorong;
+          b.x += dx * dorong; b.y += dy * dorong;
+          // dorongan yang menaikkan nomor ke atas gambar diganti dengan
+          // geseran menjauh dari sisinya, arah yang pasti tetap bebas
+          if (awalBebas[i] && !bebas(a)) { a.x = ax; a.y = ay; jauhkan(a, dorong); }
+          if (awalBebas[j] && !bebas(b)) { b.x = bx; b.y = by; jauhkan(b, dorong); }
+          if (a.x !== ax || b.x !== bx || a.y !== ay || b.y !== by) geser = true;
+        }
+      }
+      if (!geser) break;
+    }
+    return daftar;
+  }
+
+  /**
+   * Bulatan nomor beserta garis penunjuknya. Garis selalu digambar dan berakhir
+   * sedikit DI DALAM sisinya, supaya tidak ada keraguan nomor itu milik sisi yang
+   * mana — pada jaring yang rapat, angka yang menempel saja masih bisa salah baca.
+   */
+  function gambarNomor(daftar, r) {
+    return daftar.map(function (t) {
+      var dx = t.ax - t.x, dy = t.ay - t.y;
+      var d = Math.hypot(dx, dy);
+      var garis = "";
+      if (d > 1e-6) {
+        var ux = dx / d, uy = dy / d;
+        var ujungX = t.ax + ux * r * 0.75, ujungY = t.ay + uy * r * 0.75;
+        garis = '<line x1="' + num(t.x + ux * r * 0.95) + '" y1="' + num(t.y + uy * r * 0.95) +
+          '" x2="' + num(ujungX) + '" y2="' + num(ujungY) +
+          '" stroke="#1f4fc4" stroke-width="' + num(r * 0.17) + '" stroke-linecap="round"/>';
+      }
+      return garis + labelNomor(t.x, t.y, t.no, r);
+    }).join("");
+  }
+
+  /** Bulatan bernomor: putih berbingkai supaya terbaca di atas corak apa pun. */
+  function labelNomor(x, y, teksNomor, r) {
+    r = r || 11;
+    return '<g class="no-sisi"><circle cx="' + num(x) + '" cy="' + num(y) + '" r="' + num(r) +
+      '" fill="#ffffff" stroke="#1f4fc4" stroke-width="' + num(r * 0.18) + '"/>' +
+      '<text x="' + num(x) + '" y="' + num(y) + '" fill="#1f4fc4" font-size="' + num(r * 1.25) +
+      '" font-family="Arial, Helvetica, sans-serif" font-weight="700" text-anchor="middle"' +
+      ' dominant-baseline="central">' + Art.esc(teksNomor) + '</text></g>';
+  }
 
   function doc(inner, w, h, opts) {
     opts = opts || {};

@@ -24,6 +24,12 @@
 
   var EPS = 1e-6;
   var DEG = 180 / Math.PI;
+  // Batas "terbaca": sisi yang luas bayangannya kurang dari sekian kali sisi
+  // terlebar dianggap tidak terlihat, karena coraknya memang tidak terbaca.
+  // Angkanya dinaikkan ke 0,28 setelah ketahuan sisi setipis 0,23 masih dipakai
+  // menyusun soal — dua pilihan bisa tampak sama persis bagi pembaca padahal
+  // secara data berbeda, dan soalnya jadi berkunci ganda.
+  var AMBANG_TAMPAK = 0.30;
 
   // ---------------------------------------------------------------- vektor
   function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
@@ -534,7 +540,7 @@
     },
     balok: {
       name: 'Balok', short: 'Balok', faceCount: 6, pose: null, projection: 'oblique',
-      params: { p: 1.35, l: 0.8, t: 1 },
+      params: { p: 1.35, l: 1.1, t: 1 },
       paramInfo: [
         { key: 'p', label: 'Panjang' }, { key: 'l', label: 'Lebar' }, { key: 't', label: 'Tinggi' }
       ],
@@ -1265,13 +1271,32 @@
 
   // ---------------------------------------------------------------- tampilan
 
-  /** Sisi yang terlihat dari arah pandang tertentu (setelah pose bangun diterapkan). */
-  function visibleFaces(solid, M, view) {
-    var out = [];
+  /**
+   * Sisi yang terlihat dari arah pandang tertentu (setelah pose diterapkan).
+   *
+   * Sisi yang menghadap penonton tetapi bayangannya sangat tipis tidak dihitung:
+   * coraknya tidak terbaca, sehingga soal tidak boleh bergantung padanya. Tanpa
+   * saringan ini, limas segilima misalnya "memperlihatkan" empat sisi padahal
+   * hanya dua yang benar-benar terbaca, dan dua sisanya nyaris menghadap tepi.
+   */
+  function visibleFaces(solid, M, view, ambangLuas) {
+    // Luas bayangan pada proyeksi sejajar sebanding dengan luas sisi dikali
+    // kosinus sudut terhadap arah pandang. Rumus ini sahih untuk proyeksi
+    // ortografis maupun miring — memakai penghitung ortografis pada proyeksi
+    // miring membuat sisi atas dan kanan kubus dikira tak terlihat sama sekali.
+    var arah = unit(view);
+    var kandidat = [];
     solid.faces.forEach(function (f) {
-      if (dot(matVec(M, f.normal), view) > 1e-9) out.push(f.index);
+      var c = dot(matVec(M, f.normal), arah);
+      if (c <= 1e-9) return;
+      kandidat.push({ i: f.index, luas: f.area * c });
     });
-    return out;
+    if (!kandidat.length) return [];
+    var maks = 0;
+    kandidat.forEach(function (k) { maks = Math.max(maks, k.luas); });
+    var batas = maks * (ambangLuas == null ? AMBANG_TAMPAK : ambangLuas);
+    return kandidat.filter(function (k) { return k.luas >= batas; })
+      .map(function (k) { return k.i; });
   }
 
   function anglesToMatrix(yawDeg, pitchDeg) {
@@ -1323,8 +1348,15 @@
         if (f.index === utama) luasUtama = a;
       }
       if (!areas.length) return -1;
+      // Hanya sisi yang bayangannya cukup lebar yang dihitung "terlihat" — sama
+      // dengan kriteria visibleFaces(). Kalau sisi setipis garis ikut dihitung,
+      // pose yang terpilih justru memamerkan banyak sisi yang coraknya tak terbaca.
+      var maksLuas = 0;
+      for (i = 0; i < areas.length; i++) maksLuas = Math.max(maksLuas, areas[i]);
+      var terbaca = areas.filter(function (a) { return a >= maksLuas * AMBANG_TAMPAK; });
       var total = 0, min = Infinity;
-      for (i = 0; i < areas.length; i++) { total += areas[i]; min = Math.min(min, areas[i]); }
+      for (i = 0; i < terbaca.length; i++) { total += terbaca[i]; min = Math.min(min, terbaca[i]); }
+      areas = terbaca;
       // Keseimbangan diutamakan: tanpa itu, penilaian justru memilih tampilan
       // yang membuat sisi terbesar mendominasi sampai sisi lain setipis garis —
       // prisma segitiga jadi terlihat seperti kartu terlipat. Bonus sisi terbesar

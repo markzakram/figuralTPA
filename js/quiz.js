@@ -24,6 +24,110 @@
     return faces.map(function (f) { return { art: f.art, rot: f.rot }; });
   }
 
+  // =================================================================
+  // Penomoran sisi untuk pembahasan
+  // =================================================================
+
+  /**
+   * Beri nomor pada tiap sisi. Sisi yang TERLIHAT pada gambar soal mendapat
+   * nomor 1..k urut dari kiri ke kanan sebagaimana tampak di gambar, sisanya
+   * menyusul. Pembahasan memakai nomor ini, dan gambar pada halaman pembahasan
+   * mencantumkannya, sehingga pembaca tahu persis sisi mana yang dimaksud.
+   */
+  function susunNomor(solid) {
+    var M = S.poseMatrix(solid);
+    var layar = {};
+    solid.faces.forEach(function (f) {
+      var c = S.matVec(M, f.center);
+      // proyeksi miring menggeser kedalaman ke arah kiri-kanan
+      layar[f.index] = {
+        x: c[0] - (solid.projection === 'oblique' ? c[2] * 0.38 : 0),
+        y: -c[1]
+      };
+    });
+    var urut = solid.visible.slice().sort(function (a, b) {
+      return (layar[a].x - layar[b].x) || (layar[a].y - layar[b].y);
+    });
+    var nomor = {}, n = 1;
+    urut.forEach(function (i) { nomor[i] = n++; });
+    solid.faces.forEach(function (f) { if (!nomor[f.index]) nomor[f.index] = n++; });
+    return nomor;
+  }
+
+  /** Sisi terlihat yang bertetangga dengan sisi `i` — untuk kalimat "menghadap sisi X". */
+  function tetanggaTampak(solid, i) {
+    var hasil = null;
+    solid.edges.forEach(function (e) {
+      if (hasil !== null) return;
+      var lain = e.a === i ? e.b : (e.b === i ? e.a : null);
+      if (lain !== null && solid.visible.indexOf(lain) >= 0) hasil = lain;
+    });
+    return hasil;
+  }
+
+  function namaSisi(quiz, i, label) {
+    var nomor = (quiz.nomorSisi && quiz.nomorSisi[i]) || '?';
+    return 'sisi ' + nomor + (label && label !== 'polos' ? ' (' + label + ')' : '');
+  }
+
+  /**
+   * Susun kalimat pembahasan untuk satu pilihan yang salah, menyebut nomor sisi
+   * yang tercantum pada gambar halaman pembahasan. Kalimat seperti "dua sisinya
+   * tertukar" tidak menolong kalau pembaca tidak tahu sisi yang mana.
+   */
+  function teksAlasan(quiz, opt) {
+    var a = opt.alasan;
+    var huruf = 'opsi ' + String.fromCharCode(65 + quiz.options.indexOf(opt));
+    if (!a) return opt.reason || '';
+    var L = a.label || [];
+
+    if (a.jenis === 'tukar') {
+      return 'Pada ' + huruf + ', posisi ' + namaSisi(quiz, a.sisi[0], L[0]) + ' dan ' +
+        namaSisi(quiz, a.sisi[1], L[1]) + ' tertukar. Ketika jaring-jaring dilipat, kedua sisi ' +
+        'tersebut tidak akan berada pada posisi yang sama dengan bangun ruang pada soal.';
+    }
+    if (a.jenis === 'arah') {
+      var t = tetanggaTampak(quiz.solid, a.sisi[0]);
+      var salah = a.putar === 180 ? 'memiliki orientasi yang terbalik'
+        : ((a.putar === 120 ? 'diputar sepertiga putaran'
+          : a.putar === 240 ? 'diputar sepertiga putaran'
+          : 'diputar seperempat putaran') +
+           (a.putar === 90 || a.putar === 120 ? ' searah jarum jam'
+            : ' berlawanan arah jarum jam'));
+      return 'Pada ' + huruf + ', simbol pada ' + namaSisi(quiz, a.sisi[0], L[0]) + ' ' + salah +
+        '. Setelah sisi tersebut dilipat ke posisi yang ' +
+        'sesuai, arah simbol seharusnya menghadap ' +
+        (t !== null ? 'sisi ' + (quiz.nomorSisi[t] || '?') : 'sisi di sebelahnya') +
+        ' seperti pada bangun ruang soal.';
+    }
+    if (a.jenis === 'ganda') {
+      var s0 = L[0] || 'simbol yang sama';
+      return 'Pada ' + huruf + ', ' + s0 + ' muncul pada ' +
+        namaSisi(quiz, a.sisi[0]) + ' dan ' + namaSisi(quiz, a.sisi[1]) +
+        '. Pada bangun ruang soal simbol tersebut hanya menempati satu sisi, sehingga ' +
+        'susunan ini tidak mungkin terbentuk dari lipatan.';
+    }
+    if (a.jenis === 'sembunyi') {
+      var g = L[0] || 'gambar itu';
+      return 'Pada ' + huruf + ', ' + namaSisi(quiz, a.sisi[0], L[0]) + ' menempati posisi yang ' +
+        'pada bangun ruang soal ditempati ' + (a.labelAsli || 'gambar lain') + '. ' +
+        g.charAt(0).toUpperCase() + g.slice(1) + ' sebenarnya berada di sisi ' +
+        (quiz.nomorSisi[a.asal] || '?') + ', yang tidak tampak pada gambar bangun ruang soal, ' +
+        'sehingga tidak mungkin muncul di posisi tersebut.';
+    }
+    if (a.jenis === 'bentuk') {
+      if (a.susunan !== a.susunanBenar) {
+        return 'Pada ' + huruf + ', sisi-sisinya terdiri atas ' + a.susunan +
+          ', sedangkan bangun ruang pada soal tersusun dari ' + a.susunanBenar +
+          '. Susunan sisi yang berbeda tidak mungkin menghasilkan bangun yang sama.';
+      }
+      return 'Pada ' + huruf + ', jumlah dan jenis sisinya memang sama (' + a.susunan +
+        '), tetapi ukuran sisi-sisinya tidak sama dengan bangun ruang pada soal. ' +
+        'Sisi yang ukurannya berbeda tidak akan bertemu rapat ketika dilipat.';
+    }
+    return opt.reason || '';
+  }
+
   /** Tanda tangan visual: gambar apa yang tampak pada tiap sisi yang terlihat. */
   function signature(solid, faces) {
     return solid.visible.map(function (i) {
@@ -38,7 +142,7 @@
     solid.rotations.forEach(function (r) {
       var rf = S.applyRotation(faces, r);
       var sig = signature(solid, rf);
-      if (!set[sig]) { set[sig] = true; list.push({ faces: rf, sig: sig }); }
+      if (!set[sig]) { set[sig] = true; list.push({ faces: rf, sig: sig, rot: r }); }
     });
     return { set: set, list: list };
   }
@@ -72,7 +176,8 @@
       for (var b = a + 1; b < vis.length; b++) {
         var f = copyFaces(base);
         var t = f[vis[a]]; f[vis[a]] = f[vis[b]]; f[vis[b]] = t;
-        out.push({ faces: f, reason: 'dua sisi tertukar posisinya' });
+        out.push({ faces: f, alasan: { jenis: 'tukar', sisi: [vis[a], vis[b]],
+          label: [Art.label(base[vis[a]].art), Art.label(base[vis[b]].art)] } });
       }
     }
     return out;
@@ -89,12 +194,8 @@
         if (Art.visualKey(base[h].art, base[h].rot) === Art.visualKey(base[i].art, base[i].rot)) return;
         var f = copyFaces(base);
         f[i] = { art: base[h].art, rot: base[h].rot };
-        out.push({
-          faces: f,
-          reason: 'menampilkan ' + Art.label(base[h].art) + ' bersama ' +
-            Art.label(base[vis[0] === i ? vis[1] : vis[0]].art) +
-            ', padahal kedua sisi itu tidak bisa terlihat bersamaan'
-        });
+        out.push({ faces: f, alasan: { jenis: 'sembunyi', sisi: [i], asal: h,
+          label: [Art.label(base[h].art)], labelAsli: Art.label(base[i].art) } });
       });
     });
     return out;
@@ -111,10 +212,7 @@
         if (Art.canonRot(art, base[i].rot + d) === Art.canonRot(art, base[i].rot)) return;
         var f = copyFaces(base);
         f[i] = { art: art, rot: S.norm360(base[i].rot + d) };
-        out.push({
-          faces: f,
-          reason: 'arah gambar pada sisi ' + solid.faces[i].name.toLowerCase() + ' tidak sesuai'
-        });
+        out.push({ faces: f, alasan: { jenis: 'arah', sisi: [i], putar: d, label: [Art.label(base[i].art)] } });
       });
     });
     return out;
@@ -128,10 +226,8 @@
         if (solid.faces[i].sides !== solid.faces[j].sides) return;
         var f = copyFaces(base);
         f[j] = { art: base[i].art, rot: base[i].rot };
-        out.push({
-          faces: f,
-          reason: Art.label(base[i].art) + ' muncul di dua sisi, padahal hanya ada satu'
-        });
+        out.push({ faces: f, alasan: { jenis: 'ganda', sisi: [i, j],
+          label: [Art.label(base[i].art), Art.label(base[j].art)] } });
       });
     });
     return out;
@@ -216,7 +312,8 @@
     }
 
     var items = distractors.map(function (d) {
-      return { kind: 'solid', faces: d.faces, correct: false, reason: d.reason, strategy: d.strategy, sig: d.sig };
+      return { kind: 'solid', faces: d.faces, correct: false, reason: d.reason,
+        alasan: d.alasan, strategy: d.strategy, sig: d.sig };
     });
     items.push({ kind: 'solid', faces: answer.faces, correct: true, reason: '', strategy: 'kunci', sig: answer.sig });
     items = shuffle(items, rnd);
@@ -224,8 +321,15 @@
     var answerIndex = -1;
     items.forEach(function (it, i) { if (it.correct) answerIndex = i; });
 
+    var nomorGeo = susunNomor(solid);
+    var nomorNet = {};
+    solid.faces.forEach(function (f) {
+      var g = answer.rot ? answer.rot.map[f.index] : f.index;
+      nomorNet[f.index] = nomorGeo[g];
+    });
+
     return {
-      type: 'toSolid',
+      type: 'toSolid', nomorSisi: nomorGeo, nomorNet: nomorNet,
       solid: solid, faces: faces, options: items, answerIndex: answerIndex,
       answerLetter: String.fromCharCode(65 + answerIndex),
       warnings: warnings, describe: describeView(solid, answer.faces)
@@ -259,14 +363,13 @@
         if (Art.visualKey(faces[i].art, faces[i].rot) === Art.visualKey(faces[j].art, faces[j].rot)) continue;
         var sw = copyFaces(faces);
         var t = sw[i]; sw[i] = sw[j]; sw[j] = t;
-        out.push({ faces: sw, reason: 'letak dua sisinya tertukar, jadi hasil lipatannya berbeda' });
+        out.push({ faces: sw, alasan: { jenis: 'tukar', sisi: [i, j],
+          label: [Art.label(faces[i].art), Art.label(faces[j].art)] } });
 
         var dup = copyFaces(faces);
         dup[j] = { art: faces[i].art, rot: faces[i].rot };
-        out.push({
-          faces: dup,
-          reason: Art.label(faces[i].art) + ' terpasang di dua sisi, padahal hanya ada satu'
-        });
+        out.push({ faces: dup, alasan: { jenis: 'ganda', sisi: [i, j],
+          label: [Art.label(faces[i].art), Art.label(faces[j].art)] } });
       }
     }
     for (i = 0; i < n; i++) {
@@ -276,10 +379,7 @@
         if (Art.canonRot(faces[i].art, faces[i].rot + steps[k]) === Art.canonRot(faces[i].art, faces[i].rot)) continue;
         var sp = copyFaces(faces);
         sp[i] = { art: faces[i].art, rot: S.norm360(faces[i].rot + steps[k]) };
-        out.push({
-          faces: sp,
-          reason: 'arah gambar pada satu sisi menghadap ke arah yang salah setelah dilipat'
-        });
+        out.push({ faces: sp, alasan: { jenis: 'arah', sisi: [i], putar: steps[k], label: [Art.label(faces[i].art)] } });
       }
     }
     return out;
@@ -333,8 +433,7 @@
         kind: 'net', net: pick(k.nets, rnd),
         faces: k.solid.faces.map(function () { return { art: null, rot: 0 }; }),
         solidNet: k.solid, correct: false, key: k.solid.id + ':' + i,
-        reason: 'itu jaring-jaring bangun lain — susunan sisinya ' + S.compositionText(k.solid) +
-          ', sedangkan bangun pada soal butuh ' + S.compositionText(solid)
+        alasan: { jenis: 'bentuk', susunan: S.compositionText(k.solid), susunanBenar: S.compositionText(solid) }
       });
     }
 
@@ -347,7 +446,7 @@
     items.forEach(function (it, n) { if (it.correct) answerIndex = n; });
 
     return {
-      type: 'toNet', polos: true, solid: solid, faces: null, options: items,
+      type: 'toNet', polos: true, nomorSisi: susunNomor(solid), solid: solid, faces: null, options: items,
       answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
       warnings: warnings, describe: S.compositionText(solid)
     };
@@ -391,7 +490,7 @@
       used[key] = true;
       items.push({
         kind: 'net', net: nets[layout], faces: cands[c].faces,
-        correct: false, reason: cands[c].reason, key: key
+        correct: false, reason: cands[c].reason, alasan: cands[c].alasan, key: key
       });
     }
 
@@ -404,8 +503,9 @@
     var answerIndex = -1;
     items.forEach(function (it, k) { if (it.correct) answerIndex = k; });
 
+    var nomorB = susunNomor(solid);
     return {
-      type: 'toNet', solid: solid, faces: faces, options: items,
+      type: 'toNet', nomorSisi: nomorB, nomorNet: nomorB, solid: solid, faces: faces, options: items,
       answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
       warnings: warnings, describe: describeView(solid, faces)
     };
@@ -452,8 +552,7 @@
         kind: 'shape', solid: pool[i], correct: false,
         // Menyebut namanya saja tidak menolong ketika kunci dan pengecoh
         // sama-sama "bangun tak beraturan" — yang membedakan susunan sisinya.
-        reason: 'jaring-jaringnya mesti terdiri dari ' + S.compositionText(pool[i]) +
-          ', sedangkan gambar pada soal ' + S.compositionText(target)
+        alasan: { jenis: 'bentuk', susunan: S.compositionText(pool[i]), susunanBenar: S.compositionText(target) }
       });
     }
     if (items.length < count) {
@@ -465,7 +564,7 @@
     items.forEach(function (it, k) { if (it.correct) answerIndex = k; });
 
     return {
-      type: 'toShape', solid: target, faces: null, options: items,
+      type: 'toShape', nomorSisi: susunNomor(target), solid: target, faces: null, options: items,
       answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
       warnings: warnings, describe: target.name.toLowerCase() + ' (' + S.compositionText(target) + ')'
     };
@@ -505,7 +604,7 @@
       items.push({
         kind: 'faces', solid: pool[i], comp: S.composition(pool[i]), correct: false,
         key: S.compositionKey(pool[i]),
-        reason: 'itu susunan sisi ' + pool[i].name.toLowerCase() + ' (' + S.compositionText(pool[i]) + ')'
+        alasan: { jenis: 'bentuk', susunan: S.compositionText(pool[i]), susunanBenar: S.compositionText(target) }
       });
     }
     if (items.length < count) {
@@ -517,7 +616,7 @@
     items.forEach(function (it, k) { if (it.correct) answerIndex = k; });
 
     return {
-      type: 'toFaces', solid: target, faces: null, options: items,
+      type: 'toFaces', nomorSisi: susunNomor(target), solid: target, faces: null, options: items,
       answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
       warnings: warnings, describe: S.compositionText(target)
     };
@@ -599,6 +698,7 @@
     generateNetChoice: generateNetChoice, generateShapeChoice: generateShapeChoice,
     generateFaceChoice: generateFaceChoice,
     netIsValid: netIsValid, audit: audit, auditAlt: auditAlt,
-    describeView: describeView, ringkasSisi: ringkasSisi, shuffle: shuffle
+    describeView: describeView, ringkasSisi: ringkasSisi, shuffle: shuffle,
+    susunNomor: susunNomor, teksAlasan: teksAlasan, namaSisi: namaSisi
   };
 });

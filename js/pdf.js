@@ -148,7 +148,8 @@
     var rantai = Promise.resolve();
     soal.forEach(function (s) {
       rantai = rantai.then(function () {
-        return Promise.all([pasangGambar(s.gambarSoal), pasangGambar(s.gambarPilihan)]);
+        return Promise.all([pasangGambar(s.gambarSoal), pasangGambar(s.gambarPilihan),
+          s.gambarPembahasan ? pasangGambar(s.gambarPembahasan) : null]);
       }).then(function (no) {
         /* --- halaman judul --- */
         var nomor = 'No. ' + s.no;
@@ -170,20 +171,37 @@
         halamanGambar(s.gambarPilihan, no[1], 90);
 
         /* --- halaman jawaban --- */
-        var lebarIsi = LEBAR - 200;
+        // Gambar bernomor ditaruh di kiri supaya pembaca bisa menelusuri kalimat
+        // "sisi 2 dan sisi 3 tertukar" langsung ke sisi yang dimaksud.
+        var adaGambar = !!(s.gambarPembahasan && no[2]);
+        var xTeks = adaGambar ? 640 : 100;
+        var lebarIsi = LEBAR - xTeks - 100;
+        var isiJwb = [];
+
+        if (adaGambar) {
+          var gp = s.gambarPembahasan;
+          var rs = gp.lebar / gp.tinggi;
+          var gw = 480, gh = gw / rs;
+          var maxH = TINGGI - 200;
+          if (gh > maxH) { gh = maxH; gw = gh * rs; }
+          isiJwb.push('q ' + gw.toFixed(2) + ' 0 0 ' + gh.toFixed(2) + ' ' +
+            (100 + (480 - gw) / 2).toFixed(2) + ' ' + ((TINGGI - gh) / 2).toFixed(2) + ' cm /Im0 Do Q');
+        }
+
         var judul = 'Jawaban: ' + s.jawaban;
-        var bagian = [aliranTeks([judul], 100, TINGGI - 110, 30, 44, ukur, true)];
+        var bagian = [aliranTeks([judul], xTeks, TINGGI - 110, 30, 44, ukur, true)];
         var yy = bagian[0].yAkhir - 16;
-        var b = aliranTeks(['Pembahasan:'], 100, yy, 22, 34, ukur, true);
+        var b = aliranTeks(['Pembahasan:'], xTeks, yy, 22, 34, ukur, true);
         bagian.push(b);
         yy = b.yAkhir - 4;
         (s.pembahasan || []).forEach(function (p) {
-          var baris = penggal(p, lebarIsi, ukur, false, 22);
-          var c = aliranTeks(baris, 100, yy, 22, 32, ukur, false);
+          var baris = penggal(p, lebarIsi, ukur, false, 20);
+          var c = aliranTeks(baris, xTeks, yy, 20, 29, ukur, false);
           bagian.push(c);
-          yy = c.yAkhir - 10;
+          yy = c.yAkhir - 9;
         });
-        buatHalaman(bagian.map(function (x) { return x.isi; }).join('\n'));
+        isiJwb.push(bagian.map(function (x) { return x.isi; }).join('\n'));
+        buatHalaman(isiJwb.join('\n'), adaGambar ? no[2] : null);
       });
     });
 

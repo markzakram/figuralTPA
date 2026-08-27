@@ -175,8 +175,24 @@ Mengikuti format PDF generator *diagrammatical*: halaman **1440 × 810 pt**
 1. **Judul** — nomor soal, tipe soal, dan tingkat kesulitan (berwarna).
 2. **Gambar soal** — jaring-jaring atau bangun ruang, tergantung tipe.
 3. **Pilihan A–E**.
-4. **Kunci & pembahasan** — jawaban benar, alasannya, dan satu baris untuk tiap
-   pilihan yang salah.
+4. **Kunci & pembahasan** — gambar bernomor di kiri, uraian di kanan.
+
+### Pembahasan bernomor
+
+Halaman keempat menampilkan ulang **gambar soal dan opsi jawaban yang benar**,
+lengkap dengan **nomor sisi** yang sama pada keduanya. Nomor 1..k diberikan pada
+sisi yang terlihat di gambar soal, urut dari kiri ke kanan; sisi yang tersembunyi
+menyusul. Uraiannya lalu menunjuk nomor itu, misalnya:
+
+> Pada opsi D, posisi sisi 2 (bintang) dan sisi 3 (wajik) tertukar. Ketika
+> jaring-jaring dilipat, kedua sisi tersebut tidak akan berada pada posisi yang
+> sama dengan bangun ruang pada soal.
+
+Bulatan nomor selalu diletakkan **di luar** sisinya dengan garis penunjuk pendek
+yang berujung di dalam sisi tersebut. Ditaruh di dalam, bulatan sebesar itu pasti
+menutupi corak pada sisi yang kecil — padahal corak itulah yang harus dibaca.
+Penempatnya menguji jarak bulatan ke setiap sisi, jadi tidak ada nomor yang
+menimpa gambar atau menimpa nomor lain.
 
 PDF disusun langsung tanpa pustaka luar: gambar disisipkan sebagai XObject
 `DeviceGray` bila hitam-putih (datanya sepertiga) atau `DeviceRGB` bila berwarna,
@@ -248,6 +264,16 @@ lingkaran yang diputar 120° akan dikira gambar yang berbeda dan bisa melahirkan
 **Sudut pandang otomatis.** Untuk prisma dan limas, program memindai ratusan sudut lalu
 memilih yang memperlihatkan sisi terbanyak dengan luas paling seimbang, sehingga tidak
 ada sisi yang tampak setipis garis.
+
+**Ambang keterbacaan.** Sebuah sisi baru dihitung "terlihat" kalau luas bayangannya
+minimal **0,30 kali** sisi terlebar (`AMBANG_TAMPAK` di `solids.js`). Angka ini
+menentukan sisi mana yang dipakai menilai benar-salahnya pilihan, jadi ia harus
+sejalan dengan apa yang benar-benar bisa dibaca orang. Ketika ambangnya masih 0,22,
+sisi samping balok jatuh di 0,23 — cukup tipis sehingga dua pilihan yang berbeda
+datanya bisa tampak sama persis di kertas, dan soalnya jadi berkunci ganda.
+Proporsi balok pun diubah (lebar 0,8 → 1,1) supaya sisi sampingnya kembali ke 0,31.
+Diuji dengan `pembaca.js`: memodelkan pembaca yang hanya sanggup membaca sisi
+≥ 0,30, 6.000 soal (termasuk bentuk acak) tidak ada satu pun yang berkunci ganda.
 
 Setiap soal juga melewati `Quiz.audit()` sebelum ditampilkan; kalau sampai ada lebih
 dari satu pilihan yang sah, peringatan muncul di atas lembar soal.

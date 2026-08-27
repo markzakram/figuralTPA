@@ -348,10 +348,12 @@
   // ---------------------------------------------------------------- lembar soal
 
   /** Gambar jaring-jaring yang muat dalam kotak lebar x tinggi tertentu. */
-  function netFit(cells, faces, boxW, boxH, sw) {
+  function netFit(cells, faces, boxW, boxH, sw, extra) {
     var b = Solids.boundsOf(cells);
     var scale = Math.min(boxW / b.w, boxH / b.h);
-    return Render.net(cells, faces, scale, { strokeWidth: sw || 2 });
+    var o = { strokeWidth: sw || 2 };
+    if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) o[k] = extra[k];
+    return Render.net(cells, faces, scale, o);
   }
 
   /** Gambar pertanyaan (bagian atas lembar), berbeda menurut tipe soal. */
@@ -621,24 +623,87 @@
   };
   var TINGKAT_LABEL = { mudah: 'Mudah', sedang: 'Sedang', sulit: 'Sulit' };
 
+  /**
+   * Gambar untuk halaman pembahasan: gambar soal di kiri dan opsi jawaban yang
+   * benar di kanan, keduanya dengan nomor sisi yang sama. Tanpa nomor ini,
+   * kalimat "sisi 2 dan sisi 3 tertukar" tidak bisa ditelusuri pembaca.
+   */
+  function pembahasanDoc(q) {
+    var bernomor = (q.type === 'toSolid' || (q.type === 'toNet' && !q.polos)) && q.nomorSisi;
+    var kunci = q.options[q.answerIndex];
+    var kiri, kanan;
+
+    if (q.type === 'toNet') {
+      kiri = Render.solidView(q.solid, q.faces, 150,
+        { strokeWidth: 2, nomor: bernomor ? q.nomorSisi : null, ukuranNomor: 12 });
+      kanan = kunci && kunci.net
+        ? netFit(kunci.net.cells, kunci.faces, 250, 190, 2,
+            { nomor: bernomor ? q.nomorNet : null, ukuranNomor: 11 })
+        : null;
+    } else if (q.type === 'toSolid') {
+      var cells = q.netCells || netCells();
+      kiri = cells ? netFit(cells, q.faces, 250, 190, 2,
+        { nomor: bernomor ? q.nomorNet : null, ukuranNomor: 11 }) : null;
+      kanan = kunci ? Render.solidView(q.solid, kunci.faces, 150,
+        { strokeWidth: 2, nomor: bernomor ? q.nomorSisi : null, ukuranNomor: 12 }) : null;
+    } else if (q.type === 'toShape') {
+      var c2 = q.netCells || netCells();
+      kiri = c2 ? netFit(c2, null, 250, 190, 2) : null;
+      kanan = kunci ? Render.solidView(kunci.solid, null, 150, { strokeWidth: 2 }) : null;
+    } else {
+      kiri = Render.solidView(q.solid, null, 150, { strokeWidth: 2 });
+      kanan = kunci ? Render.shapes(kunci.comp, 96, { strokeWidth: 1.8 }) : null;
+    }
+    if (!kiri) return '';
+
+    var judulKiri = (q.type === 'toNet' || q.type === 'toFaces') ? 'Bangun ruang pada soal' : 'Jaring-jaring pada soal';
+    var judulKanan = 'Opsi ' + q.answerLetter + ' (jawaban)';
+    var gap = 46, pad = 14, atas = 20;
+    var lebar = kiri.width + (kanan ? gap + kanan.width : 0);
+    var tinggi = Math.max(kiri.height, kanan ? kanan.height : 0);
+    var bagian = [];
+
+    bagian.push(Render.text(judulKiri, kiri.width / 2, 12, { size: 13, weight: 700, anchor: 'middle', fill: '#334' }));
+    bagian.push('<g transform="translate(0,' + Render.num(atas) + ')">' + kiri.svg + '</g>');
+    if (kanan) {
+      var x = kiri.width + gap;
+      bagian.push(Render.text('→', kiri.width + gap / 2, atas + tinggi / 2,
+        { size: 26, weight: 700, anchor: 'middle', fill: '#8a93a6' }));
+      bagian.push(Render.text(judulKanan, x + kanan.width / 2, 12, { size: 13, weight: 700, anchor: 'middle', fill: '#334' }));
+      bagian.push('<g transform="translate(' + Render.num(x) + ',' + Render.num(atas) + ')">' + kanan.svg + '</g>');
+    }
+    return Render.doc('<g transform="translate(' + pad + ',' + pad + ')">' + bagian.join('') + '</g>',
+      lebar + pad * 2, tinggi + atas + pad * 2, { background: '#ffffff' });
+  }
+
   /** Uraian jawaban untuk halaman pembahasan PDF. */
   function pembahasan(q) {
-    var out = [];
-    var kunci = 'Jawaban benar: ' + q.answerLetter + '. ';
+    var L = q.answerLetter;
+    var out = [];        // judul "Jawaban:" dan "Pembahasan:" dicetak oleh pdf.js
+
     if (q.type === 'toNet') {
-      kunci += 'Jaring-jaring itu bila dilipat menghasilkan bangun pada soal — sisi yang tampak: ' +
-        q.describe + '.';
+      out.push('Jaring-jaring pada opsi ' + L + ' dapat dilipat sehingga menghasilkan susunan ' +
+        'sisi yang sama dengan bangun ruang pada soal.');
+    } else if (q.type === 'toSolid') {
+      out.push('Bangun ruang pada opsi ' + L + ' merupakan hasil lipatan jaring-jaring pada soal, ' +
+        'sehingga susunan sisinya sama.');
     } else if (q.type === 'toShape') {
-      kunci += 'Jaring-jaring pada soal membentuk ' + q.describe + '.';
-    } else if (q.type === 'toFaces') {
-      kunci += 'Bangun pada soal tersusun dari ' + q.describe + '.';
+      out.push('Jaring-jaring pada soal tersusun dari ' + q.describe +
+        ', sehingga bila dilipat menghasilkan bangun ruang pada opsi ' + L + '.');
     } else {
-      kunci += 'Setelah jaring-jaring dilipat, sisi yang tampak adalah ' + q.describe + '.';
+      out.push('Bangun ruang pada soal dibatasi oleh ' + q.describe +
+        ', yaitu susunan bangun datar pada opsi ' + L + '.');
     }
-    out.push(kunci);
-    out.push('Pilihan lain tidak mungkin:');
+
+    if (q.nomorSisi && (q.type === 'toSolid' || (q.type === 'toNet' && !q.polos))) {
+      out.push('Nomor sisi pada gambar di samping dipakai sebagai acuan penjelasan berikut.');
+    }
+
+    out.push('Mengapa opsi lain salah:');
     q.options.forEach(function (o, i) {
-      if (!o.correct) out.push(String.fromCharCode(65 + i) + '. ' + (o.reason || 'tidak sesuai') + '.');
+      if (o.correct) return;
+      var t = (typeof Quiz.teksAlasan === 'function' ? Quiz.teksAlasan(q, o) : o.reason) || '';
+      out.push(String.fromCharCode(65 + i) + '. ' + (t || 'Susunan sisinya tidak sesuai dengan soal.'));
     });
     return out;
   }
@@ -655,6 +720,7 @@
       solid: q.solid.name,
       tipe: TIPE_LABEL[q.type] || '',
       tingkat: q.type === 'toSolid' ? (TINGKAT_LABEL[$('difficulty').value] || '') : '',
+      pembahasanSvg: pembahasanDoc(q),
       pembahasan: pembahasan(q)
     });
     if (!diam) renderBank();
@@ -793,7 +859,8 @@
           jawaban: it.letter,
           pembahasan: it.pembahasan,
           gambarSoal: await Raster.svgKePiksel(it.soalSvg, 2),
-          gambarPilihan: await Raster.svgKePiksel(it.pilihanSvg, 2)
+          gambarPilihan: await Raster.svgKePiksel(it.pilihanSvg, 2),
+          gambarPembahasan: it.pembahasanSvg ? await Raster.svgKePiksel(it.pembahasanSvg, 2) : null
         });
         bar.value = i + 1;
         batchStatus('Menyiapkan halaman ' + (i + 1) + '/' + state.bank.length + '…');

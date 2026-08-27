@@ -56,7 +56,7 @@
         return { lebar: w, tinggi: h, data: data, kanal: 1 };
       }
       data = new Uint8Array(n * 3);
-      for (i = 0, j = 0; j < n; i += 4, j += 3) {
+      for (i = 0, j = 0; j < n * 3; i += 4, j += 3) {
         data[j] = rgba[i]; data[j + 1] = rgba[i + 1]; data[j + 2] = rgba[i + 2];
       }
       return { lebar: w, tinggi: h, data: data, kanal: 3 };
