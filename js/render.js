@@ -65,10 +65,15 @@
    * @param {Array} poly titik sisi dalam koordinat layar
    * @param {Object} box {o,U,V} kotak gambar dalam koordinat layar
    */
-  function facePiece(poly, box, state, opts, id) {
+  /**
+   * @param {boolean} tanpaGaris jangan gambar rusuknya di sini — dipakai oleh
+   *        jaring-jaring, yang menggambar rusuk pada lapisan tersendiri agar
+   *        garis lipatan bisa dibuat putus-putus.
+   */
+  function facePiece(poly, box, state, opts, id, tanpaGaris) {
     var art = state && state.art;
     var rot = (state && state.rot) || 0;
-    var stroke = opts.stroke || '#111111';
+    var stroke = tanpaGaris ? 'none' : (opts.stroke || '#111111');
     var sw = opts.strokeWidth != null ? opts.strokeWidth : 2;
     var body = Art.shape(art);
     var out = '', defs = '';
@@ -156,28 +161,65 @@
    * @param {Array} cells sel jaring-jaring
    * @param {Array} faces keadaan tiap sisi {art, rot}
    */
+  /**
+   * Gambar jaring-jaring.
+   *
+   * Rusuk digambar dalam satu lapisan tersendiri, bukan per sisi, supaya bisa
+   * dibedakan: rusuk yang dimiliki DUA sisi adalah garis LIPATAN dan digambar
+   * putus-putus, sedangkan rusuk yang hanya dimiliki satu sisi adalah tepi luar
+   * dan digambar penuh — mengikuti kelaziman gambar jaring-jaring.
+   */
   function net(cells, faces, scale, opts) {
     opts = opts || {};
     var pad = opts.pad || 0;
     var b = S.boundsOf(cells);
     var prefix = 'n' + (++uid) + '_';
     var body = [], defs = [];
+    var stroke = opts.stroke || '#111111';
+    var sw = opts.strokeWidth != null ? opts.strokeWidth : 2;
 
     function P(p) { return [pad + (p[0] - b.x0) * scale, pad + (b.y1 - p[1]) * scale]; }
     function D(v) { return [v[0] * scale, -v[1] * scale]; }
 
+    var rusuk = {};
+    function catat(a, b2) {
+      var ka = a.map(function (v) { return Math.round(v * 1e6); }).join(',');
+      var kb = b2.map(function (v) { return Math.round(v * 1e6); }).join(',');
+      var k = ka < kb ? ka + '|' + kb : kb + '|' + ka;
+      if (rusuk[k]) rusuk[k].n++;
+      else rusuk[k] = { a: a, b: b2, n: 1 };
+    }
+
     cells.forEach(function (c) {
-      var piece = facePiece(
-        c.poly.map(P),
-        { o: P(c.box.o), U: D(c.box.U), V: D(c.box.V) },
-        faces && faces[c.face], opts, prefix + c.face
-      );
+      var titik = c.poly.map(P);
+      var piece = facePiece(titik, { o: P(c.box.o), U: D(c.box.U), V: D(c.box.V) },
+        faces && faces[c.face], opts, prefix + c.face, true);
       body.push('<g data-face="' + c.face + '" class="net-face">' + piece.body + '</g>');
       if (piece.defs) defs.push(piece.defs);
+      for (var i = 0; i < titik.length; i++) catat(titik[i], titik[(i + 1) % titik.length]);
     });
 
+    // thumbnail terlalu kecil untuk garis putus-putus — di sana semua digambar penuh
+    var pakaiPutus = opts.lipatan !== false && scale >= 22;
+    var luar = [], lipat = [];
+    Object.keys(rusuk).forEach(function (k) {
+      var r = rusuk[k];
+      var g = '<line x1="' + num(r.a[0]) + '" y1="' + num(r.a[1]) +
+        '" x2="' + num(r.b[0]) + '" y2="' + num(r.b[1]) + '"/>';
+      (r.n > 1 && pakaiPutus ? lipat : luar).push(g);
+    });
+
+    var garis = '<g fill="none" stroke="' + stroke + '" stroke-width="' + sw +
+      '" stroke-linecap="round">' + luar.join('') + '</g>';
+    if (lipat.length) {
+      var putus = Math.max(2.5, scale * 0.16);
+      garis += '<g fill="none" stroke="' + stroke + '" stroke-width="' + Math.max(1, sw * 0.8) +
+        '" stroke-dasharray="' + num(putus) + ' ' + num(putus * 0.7) +
+        '" stroke-linecap="butt">' + lipat.join('') + '</g>';
+    }
+
     return {
-      svg: (defs.length ? '<defs>' + defs.join('') + '</defs>' : '') + body.join(''),
+      svg: (defs.length ? '<defs>' + defs.join('') + '</defs>' : '') + body.join('') + garis,
       width: b.w * scale + pad * 2,
       height: b.h * scale + pad * 2
     };

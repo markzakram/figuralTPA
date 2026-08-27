@@ -434,14 +434,25 @@
     // membuat seluruh bentuk terasa sekeluarga; keempatnya bersama memberi
     // ragam yang jauh lebih lebar tanpa mengorbankan keterbacaan.
     var jenis = rnd();
-    if (jenis > 0.86) {
-      var sisiF = 3 + Math.floor(rnd() * 4);            // 3..6 sisi alas
+    // Sebagian prisma dibuat miring agar siluetnya tidak selalu tegak. Kemiringan
+    // ditahan kecil: geseran besar membuat pita jaringnya menggunting menyerong
+    // sehingga sulit dibaca, dan bangunnya sendiri tampak nyaris rebah.
+    var geser = rnd() < 0.28 ? [(rnd() - 0.5) * 0.3, (rnd() - 0.5) * 0.3] : null;
+
+    // Bobot keluarga: poliomino ~46%, penampang cembung ~36%, limas terpancung ~18%.
+    // Poliomino sengaja tidak lagi mayoritas mutlak — sebelumnya 62% dan seluruh
+    // bentuk jadi terasa sekeluarga (blok siku L/V) meski jumlahnya ratusan.
+    if (jenis > 0.82) {
+      // Alas minimal 4 sisi dan ketirusan ditahan (tutup 55-80% alas). Ketirusan
+      // yang tajam membuat bidang tegaknya membuka menjadi kipas yang melingkar
+      // hampir penuh — jaringnya sah tetapi terlihat kusut dan sulit dibayangkan.
+      var sisiF = 4 + Math.floor(rnd() * 3);            // 4..6 sisi alas
       var rBawah = 0.6 + rnd() * 0.12;
-      return frustumSolid(sisiF, rBawah, rBawah * (0.35 + rnd() * 0.35), 0.75 + rnd() * 0.5);
+      return frustumSolid(sisiF, rBawah, rBawah * (0.55 + rnd() * 0.25), 0.55 + rnd() * 0.35);
     }
-    if (jenis > 0.62) {
+    if (jenis > 0.46) {
       var cembung = penampangCembung(rnd);
-      if (cembung) return ekstrusi(cembung, 0.6 + Math.floor(rnd() * 5) * 0.22);
+      if (cembung) return ekstrusi(cembung, 0.42 + Math.floor(rnd() * 5) * 0.13, geser);
     }
 
     var pts = null;
@@ -481,11 +492,19 @@
     // Tebal dijaga sebanding dengan penampang (yang dinormalkan ke 1). Kalau
     // terlalu tipis, pita jaring memanjang seperti penggaris dan kedua tutupnya
     // tampak kecil sehingga bentuknya sulit dibayangkan.
-    return ekstrusi(pts, opsi.tebal || (0.7 + Math.floor(rnd() * 4) * 0.2));
+    // Tebal ditahan di bawah lebar penampang. Sebelumnya bisa mencapai 1,3 kali
+    // penampang sehingga bangunnya menjulang seperti tiang; bentuk rujukan justru
+    // lebih rebah — lebarnya melebihi tingginya.
+    return ekstrusi(pts, opsi.tebal || (0.42 + Math.floor(rnd() * 4) * 0.14), geser);
   }
 
-  /** Ekstrusi poligon datar (koordinat bebas) menjadi prisma, dinormalkan ke lebar 1. */
-  function ekstrusi(pts, tebal) {
+  /**
+   * Ekstrusi poligon datar menjadi prisma, dinormalkan ke lebar 1.
+   * `geser` menggeser tutup atas ke samping sehingga terbentuk prisma MIRING —
+   * sisi tegaknya menjadi jajar genjang dan siluetnya jelas berbeda dari prisma
+   * tegak, padahal jaring-jaringnya tetap berupa pita yang mudah dibaca.
+   */
+  function ekstrusi(pts, tebal, geser) {
     var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
     var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
     var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
@@ -494,9 +513,10 @@
       return [(p[0] - (x0 + x1) / 2) * k, (p[1] - (y0 + y1) / 2) * k];
     });
 
+    var gx = geser ? geser[0] : 0, gz = geser ? geser[1] : 0;
     var n = datar.length, verts = [], faces = [], i;
     for (i = 0; i < n; i++) verts.push([datar[i][0], -tebal / 2, datar[i][1]]);
-    for (i = 0; i < n; i++) verts.push([datar[i][0], tebal / 2, datar[i][1]]);
+    for (i = 0; i < n; i++) verts.push([datar[i][0] + gx, tebal / 2, datar[i][1] + gz]);
 
     faces.push({ v: datar.map(function (_, j) { return j; }), name: 'Alas' });
     faces.push({ v: datar.map(function (_, j) { return n + j; }), name: 'Tutup' });
@@ -859,6 +879,11 @@
       };
     });
 
+    // Catatan: sempat dicoba menuntut JARAK minimum antar sisi yang tidak
+    // bertetangga di pohon, dengan harapan menyingkirkan jaring yang terlihat
+    // rapat. Aturan itu salah — pada jaring yang sah pun sisi yang bukan
+    // tetangga lazim bersentuhan di sudut, sehingga seluruh jaring (termasuk
+    // ke-11 jaring kubus) ikut terbuang. Yang dipakai tetap uji tumpang tindih.
     for (var a = 0; a < cells.length; a++) {
       for (var b = a + 1; b < cells.length; b++) {
         if (polyOverlap(cells[a].poly, cells[b].poly)) {
@@ -902,6 +927,29 @@
       if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) di = !di;
     }
     return di;
+  }
+
+  /** jarak terdekat titik ke ruas garis */
+  function jarakKeRuas(p, a, b) {
+    var vx = b[0] - a[0], vy = b[1] - a[1];
+    var L2 = vx * vx + vy * vy;
+    var t = L2 ? ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / L2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    var dx = p[0] - (a[0] + t * vx), dy = p[1] - (a[1] + t * vy);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  /** jarak terdekat antara dua poligon yang tidak bertindih */
+  function jarakPoligon(A, B) {
+    var min = Infinity, i, j;
+    for (i = 0; i < A.length; i++) {
+      for (j = 0; j < B.length; j++) {
+        min = Math.min(min,
+          jarakKeRuas(A[i], B[j], B[(j + 1) % B.length]),
+          jarakKeRuas(B[j], A[i], A[(i + 1) % A.length]));
+      }
+    }
+    return min;
   }
 
   function polyOverlap(A, B) {
@@ -1093,22 +1141,59 @@
     }
     if (pita.some(function (e) { return !e; })) return null;
 
-    var out = [], seen = {};
-    for (var a = 0; a < st.gelang.length && out.length < limit; a++) {
-      for (var b = 0; b < st.gelang.length && out.length < limit; b++) {
-        var e1 = rusukAntar[st.tutup[0] + '-' + st.gelang[a]];
-        var e2 = rusukAntar[st.tutup[1] + '-' + st.gelang[b]];
-        if (!e1 || !e2) continue;
-        var pohon = pita.concat([e1, e2]);
-        if (!isSpanningTree(solid.faces.length, pohon)) continue;
-        var key = treeKey(solid, pohon);
-        if (seen[key]) continue;
-        seen[key] = true;
-        var u = unfold(solid, pohon);
-        if (!u.ok) continue;
-        var cells = u.cells, bo = boundsOf(cells);
-        if (bo.h > bo.w + 1e-9) { cells = rotateCells(cells, 90); bo = boundsOf(cells); }
-        out.push({ cells: cells, bounds: bo, tree: pohon.slice(), key: key });
+    var out = [], seen = {}, jml = solid.faces.length, g = st.gelang.length;
+
+    function coba(pohon) {
+      if (out.length >= limit) return;
+      if (pohon.some(function (e) { return !e; })) return;
+      if (!isSpanningTree(jml, pohon)) return;
+      var key = treeKey(solid, pohon);
+      if (seen[key]) return;
+      seen[key] = true;
+      var u = unfold(solid, pohon);
+      if (!u.ok) return;
+      var cells = u.cells, bo = boundsOf(cells);
+      if (bo.h > bo.w + 1e-9) { cells = rotateCells(cells, 90); bo = boundsOf(cells); }
+      out.push({ cells: cells, bounds: bo, tree: pohon.slice(), key: key });
+    }
+
+    var a, b, k;
+    // (1) pita utuh: seluruh sisi tegak berderet lurus, dua tutup menempel
+    for (a = 0; a < g; a++) {
+      for (b = 0; b < g; b++) {
+        coba(pita.concat([
+          rusukAntar[st.tutup[0] + '-' + st.gelang[a]],
+          rusukAntar[st.tutup[1] + '-' + st.gelang[b]]
+        ]));
+      }
+    }
+
+    // (2) pita TERPUTUS: sisi tegak dipecah jadi dua deret pendek yang menempel
+    // pada tutup berbeda. Jaringnya jadi berbentuk L atau T, bukan "ulat" panjang.
+    // Tanpa ini seluruh jaring bangun tak beraturan bertata letak sama persis.
+    // Jumlahnya dibatasi separuh: kalau mendominasi, jaringnya jadi terlalu ruwet.
+    // Sepertiga saja yang berupa pita terputus. Terlalu banyak membuat jaringnya
+    // bercabang ke mana-mana dan lipatannya sulit dibayangkan.
+    var batasTerputus = Math.max(out.length, Math.ceil(limit * 0.34));
+    for (k = 1; k < g - 1 && out.length < batasTerputus; k++) {
+      var kiri = [], kanan = [], i;
+      for (i = 0; i + 1 < k; i++) kiri.push(rusukAntar[st.gelang[i] + '-' + st.gelang[i + 1]]);
+      for (i = k; i + 1 < g; i++) kanan.push(rusukAntar[st.gelang[i] + '-' + st.gelang[i + 1]]);
+      for (a = 0; a < k && out.length < batasTerputus; a++) {
+        for (b = k; b < g && out.length < batasTerputus; b++) {
+          // tutup 0 memegang deret kiri, tutup 1 memegang deret kanan,
+          // lalu satu rusuk penghubung menyatukan kedua kelompok
+          var dasar = kiri.concat(kanan, [
+            rusukAntar[st.tutup[0] + '-' + st.gelang[a]],
+            rusukAntar[st.tutup[1] + '-' + st.gelang[b]]
+          ]);
+          for (var c = 0; c < g && out.length < batasTerputus; c++) {
+            var sambung = (c < k)
+              ? rusukAntar[st.tutup[1] + '-' + st.gelang[c]]
+              : rusukAntar[st.tutup[0] + '-' + st.gelang[c]];
+            coba(dasar.concat([sambung]));
+          }
+        }
       }
     }
     return out.length ? out : null;
@@ -1247,10 +1332,12 @@
       return areas.length + 1.2 * (min / total) + 0.5 * Math.min(luasUtama / total, 0.5);
     }
 
+    var bagus = [];        // semua pose yang nilainya mendekati terbaik
     function sapu(y0, y1, langkahY, p0, p1, langkahP) {
       for (var yaw = y0; yaw < y1; yaw += langkahY) {
         for (var pitch = p0; pitch <= p1; pitch += langkahP) {
           var s = nilai(((yaw % 360) + 360) % 360, pitch);
+          bagus.push({ yaw: yaw, pitch: pitch, s: s });
           if (s > bestScore + 1e-9) {
             bestScore = s;
             best = { yaw: yaw, pitch: pitch };
@@ -1265,6 +1352,19 @@
     sapu(0, 360, 6, 6, 46, 3);
     var ky = best.yaw, kp = best.pitch;
     sapu(ky - 6, ky + 6, 2, Math.max(6, kp - 3), Math.min(46, kp + 3), 1);
+
+    // Selalu mengambil pose TERBAIK membuat seluruh bangun tampak dari sudut yang
+    // hampir sama — seratus soal jadi terasa berulang. Karena itu dipilih secara
+    // acak (berbenih, jadi tetap dapat diulang) di antara pose yang sama bagusnya.
+    var benih = solid.params && solid.params.benih;
+    if (benih) {
+      var ambang = bestScore - 0.06;
+      var layak = bagus.filter(function (p) { return p.s >= ambang; });
+      if (layak.length) {
+        var pilih = layak[Math.floor(mulberry32(benih * 7919 + 13)() * layak.length)];
+        best = { yaw: pilih.yaw, pitch: pilih.pitch };
+      }
+    }
 
     if (best.yaw > 180) best.yaw -= 360;
     if (best.yaw < -180) best.yaw += 360;

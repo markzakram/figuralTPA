@@ -543,6 +543,21 @@
         var sd = Solids.build('balok', uk);
         _pool.push({ solid: sd, nets: Solids.nets(sd, 8) });
       });
+      // Limas terpancung dengan alas dan ketirusan berbeda. Bentuk mengerucut
+      // hanya muncul pada sebagian benih, jadi tanpa penambahan ini soal limas
+      // terpancung sering hanya berpengecoh prisma tegak — yang langsung terlihat
+      // salah karena tidak menirus.
+      [12345, 22222, 33333, 44444, 55555, 66666, 77777, 88888].forEach(function (bn) {
+        var sd = null;
+        for (var t = 0; t < 40 && !sd; t++) {
+          var c = Solids.build('acak', { benih: bn + t });
+          // kenali dari susunan sisinya: limas terpancung punya sisi trapesium
+          if (/trapesium/.test(Solids.compositionText(c))) sd = c;
+        }
+        if (!sd) return;
+        var jr = Solids.nets(sd, 8);
+        if (jr.length) _pool.push({ solid: sd, nets: jr });
+      });
     }
     // bangun yang sedang dipilih selalu versi terbaru (ukuran balok / benih bentuk)
     var kunci = Solids.shapeKey(state.solid);

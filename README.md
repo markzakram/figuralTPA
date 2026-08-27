@@ -64,10 +64,26 @@ Bentuknya dibangkitkan, bukan digambar manual, dari **empat keluarga**:
 | penampang cembung | poligon cembung acak 4–6 sisi, lalu diekstrusi | prisma trapesium, segilima/segienam tak beraturan |
 | limas terpancung | dua poligon sejajar berbeda ukuran + sisi trapesium | limas terpotong, jaringnya berbentuk kipas |
 
-Satu keluarga saja membuat semua bentuk terasa sekeluarga. Keempatnya bersama
-menghasilkan **365 bangun berbeda dari 278 penampang**, masing-masing dengan
-~8 jaring-jaring — sekitar **2.850 pasangan bentuk × jaring**. Jumlah sisinya
-menyebar dari 5 sampai 11.
+Sebagian prisma dibuat **miring** (tutup atas digeser) supaya siluetnya tidak
+selalu tegak. Keempat keluarga bersama menghasilkan **500 bangun berbeda dari
+369 penampang**, masing-masing dengan ~8 jaring-jaring — sekitar **3.980 pasangan
+bentuk × jaring**. Jumlah sisinya menyebar dari 6 sampai 11.
+
+**Garis lipatan digambar putus-putus.** Rusuk yang dimiliki dua sisi adalah garis
+lipatan; yang hanya dimiliki satu sisi adalah tepi luar. Karena itu rusuk digambar
+pada lapisan tersendiri, bukan per sisi, sehingga keduanya bisa dibedakan seperti
+pada gambar jaring-jaring yang lazim.
+
+**Bangunnya dijaga rebah, bukan menjulang.** Tebal ekstrusi ditahan di bawah lebar
+penampang (median tinggi:lebar 0,68; tidak ada yang melebihi 1,0). Sebelumnya tebal
+bisa 1,3 kali penampang dan bangunnya terlihat seperti tiang.
+
+**Tata letak jaring tidak lagi seragam.** Selain pita lurus, sebagian jaring memakai
+pita *terputus*: sisi tegak dipecah jadi dua deret pendek yang menempel pada tutup
+berbeda, menghasilkan jaring berbentuk L, T, atau Y. Porsinya dibatasi sepertiga —
+kalau mendominasi, jaringnya bercabang ke mana-mana dan sulit dibayangkan. Sudut
+pandang 3D juga dipilih acak (berbenih) di antara pose yang sama bagusnya, supaya
+seratus soal tidak tampak dari sudut yang sama.
 
 Tiap bentuk punya nomor benih; benih yang sama selalu menghasilkan bentuk yang sama,
 dan tombol *Acak bentuk* mengambil benih baru.
