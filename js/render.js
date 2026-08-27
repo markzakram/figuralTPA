@@ -229,20 +229,39 @@
 
     // thumbnail terlalu kecil untuk garis putus-putus — di sana semua digambar penuh
     var pakaiPutus = opts.lipatan !== false && scale >= 22;
+
+    /**
+     * Pola putus-putus yang PAS sepanjang rusuknya: jumlah strip dibulatkan lalu
+     * panjang strip disesuaikan, sehingga garis selalu mulai dan berakhir dengan
+     * strip, tidak terpotong setengah. Satu pola tetap untuk semua rusuk membuat
+     * rusuk pendek hanya kebagian dua-tiga strip panjang — di kertas itu terbaca
+     * sebagai garis patah yang tidak rapi, bukan garis lipatan.
+     */
+    var periode = Math.min(9, Math.max(2.6, scale * 0.075));
+    var ISI = 0.5;                       // bagian strip terhadap satu periode
+    function polaPutus(panjang) {
+      var jml = Math.max(3, Math.round(panjang / periode));
+      var d = panjang / (jml + (jml - 1) * (1 - ISI) / ISI);
+      return num(d) + ' ' + num(d * (1 - ISI) / ISI);
+    }
+
     var luar = [], lipat = [];
     Object.keys(rusuk).forEach(function (k) {
       var r = rusuk[k];
-      var g = '<line x1="' + num(r.a[0]) + '" y1="' + num(r.a[1]) +
-        '" x2="' + num(r.b[0]) + '" y2="' + num(r.b[1]) + '"/>';
-      (r.n > 1 && pakaiPutus ? lipat : luar).push(g);
+      var awal = '<line x1="' + num(r.a[0]) + '" y1="' + num(r.a[1]) +
+        '" x2="' + num(r.b[0]) + '" y2="' + num(r.b[1]) + '"';
+      if (r.n > 1 && pakaiPutus) {
+        var pj = Math.hypot(r.b[0] - r.a[0], r.b[1] - r.a[1]);
+        lipat.push(awal + ' stroke-dasharray="' + polaPutus(pj) + '"/>');
+      } else {
+        luar.push(awal + '/>');
+      }
     });
 
     var garis = '<g fill="none" stroke="' + stroke + '" stroke-width="' + sw +
       '" stroke-linecap="round">' + luar.join('') + '</g>';
     if (lipat.length) {
-      var putus = Math.max(2.5, scale * 0.16);
-      garis += '<g fill="none" stroke="' + stroke + '" stroke-width="' + Math.max(1, sw * 0.8) +
-        '" stroke-dasharray="' + num(putus) + ' ' + num(putus * 0.7) +
+      garis += '<g fill="none" stroke="' + stroke + '" stroke-width="' + Math.max(0.9, sw * 0.7) +
         '" stroke-linecap="butt">' + lipat.join('') + '</g>';
     }
 

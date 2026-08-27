@@ -73,6 +73,12 @@ lipatan; yang hanya dimiliki satu sisi adalah tepi luar. Karena itu rusuk digamb
 pada lapisan tersendiri, bukan per sisi, sehingga keduanya bisa dibedakan seperti
 pada gambar jaring-jaring yang lazim.
 
+Pola putusnya **dipaskan pada tiap rusuk**: jumlah strip dibulatkan dari panjang
+rusuk, lalu panjang stripnya disesuaikan supaya garis selalu mulai dan berakhir
+dengan strip. Dengan satu pola tetap untuk semua rusuk, rusuk pendek hanya kebagian
+dua-tiga strip panjang dan di kertas terbaca sebagai garis patah yang tidak rapi.
+Panjang stripnya juga dikecilkan dari 0,16 menjadi 0,075 kali skala gambar.
+
 **Bangunnya dijaga rebah, bukan menjulang.** Tebal ekstrusi ditahan di bawah lebar
 penampang (median tinggi:lebar 0,68; tidak ada yang melebihi 1,0). Sebelumnya tebal
 bisa 1,3 kali penampang dan bangunnya terlihat seperti tiang.
