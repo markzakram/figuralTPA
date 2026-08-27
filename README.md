@@ -127,13 +127,15 @@ variasi:
 | Pilihan | Arti |
 |---|---|
 | Variasi: *Acak gambar sisi* | tiap soal memakai gambar sisi baru, bangun ruangnya tetap |
+| Variasi: *Acak bentuk tak beraturan* | tiap soal memakai bentuk tak beraturan yang baru — sama seperti menekan *Acak bentuk* untuk setiap nomor |
 | Variasi: *Acak gambar + bangun ruang* | bangun ruang ikut berganti-ganti antar soal |
 | Variasi: *Ikuti isian sekarang* | semua soal memakai isian yang sedang tampil |
 | Tipe: *Ikuti pilihan di atas* | satu tipe soal untuk seluruh paket |
 | Tipe: *Campuran semua tipe* | keempat tipe soal dipakai bergantian |
 
 Bentuk jaring-jaring juga diacak dari daftar jaring bangun tersebut, sehingga soal
-yang berdekatan tidak memakai bentuk yang sama. Tombol *Acak* pada editor punya
+yang berdekatan tidak memakai bentuk yang sama. Untuk paket 100 soal dengan variasi
+*Acak bentuk tak beraturan*, sekitar 50 bentuk kunci yang berbeda akan muncul. Tombol *Acak* pada editor punya
 centang **Warna tetap**: gambar tiap sisi diacak tetapi warna gambar dan warna
 latarnya dipertahankan.
 
@@ -195,6 +197,18 @@ calon itu dibuang.
 **Pilihan jawaban (tipe C & D).** Pengecoh diambil dari bangun ruang lain, tetapi yang
 sidik bentuknya (tipe C) atau susunan bangun datarnya (tipe D) sama dengan kunci akan
 dibuang — misalnya balok berukuran 1:1:1 tidak akan dijadikan pengecoh untuk soal kubus.
+
+**Pengecoh dipilih yang paling MIRIP dengan kunci.** Pengecoh berupa limas untuk soal
+prisma langsung tercoret penjawab tanpa perlu berpikir, jadi soalnya jadi terlalu mudah.
+Kandidat kini diurutkan menurut jarak kemiripan — selisih jumlah sisi, selisih daftar
+luas sisi, selisih daftar bentuk sisi, dan kesamaan susunan bangun datar — lalu diambil
+secara acak dari sekumpulan yang paling dekat. Hasilnya untuk bangun tak beraturan:
+**100% pengecoh berjumlah sisi sama dengan kunci**, dan jarak kemiripan rata-rata turun
+dari 17,8 (bentuk sembarang) menjadi 0,94. Untuk soal kubus, kolam pembanding memuat
+beberapa balok berperbandingan berbeda agar pengecohnya tetap berdekatan.
+
+Kedua sidik bentuk itu disimpan pada objek bangunnya karena pemilih pengecoh
+memanggilnya ratusan kali per soal.
 
 **Simetri gambar.** Perbandingan memakai `Art.visualKey()` yang memperhitungkan simetri
 putar tiap gambar: orde 0 (sama dari segala arah — lingkaran, cincin, mata dadu 1),

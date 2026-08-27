@@ -1116,29 +1116,53 @@
     // sisi terbesar = "wajah" bangun; kalau ia terbaca, bentuknya mudah dikenali
     var utama = 0, luasMaks = -1;
     solid.faces.forEach(function (f) { if (f.area > luasMaks) { luasMaks = f.area; utama = f.index; } });
-    for (var yaw = 0; yaw < 360; yaw += 2) {
-      for (var pitch = 6; pitch <= 46; pitch += 2) {
-        var M = anglesToMatrix(yaw, pitch);
-        var areas = [], luasUtama = 0;
-        solid.faces.forEach(function (f) {
-          if (dot(matVec(M, f.normal), [0, 0, 1]) <= 1e-6) return;
-          var a = shadowArea(f.poly, M);
-          areas.push(a);
-          if (f.index === utama) luasUtama = a;
-        });
-        if (!areas.length) continue;
-        var total = areas.reduce(function (a, b) { return a + b; }, 0);
-        // Selain jumlah sisi dan keseimbangan, tampilan yang memperlihatkan sisi
-        // TERBESAR dengan jelas lebih mudah dibaca: pada prisma, sisi itu adalah
-        // penampangnya, dan penampang yang terbaca membuat bentuk langsung dikenali.
-        var score = areas.length + 0.5 * (Math.min.apply(null, areas) / total)
-          + 0.8 * (luasUtama / total);
-        if (score > bestScore + 1e-9) {
-          bestScore = score;
-          best = { yaw: yaw > 180 ? yaw - 360 : yaw, pitch: pitch };
+    /**
+     * Nilai sebuah sudut pandang. Selain jumlah sisi yang tampak dan
+     * keseimbangan luasnya, tampilan yang memperlihatkan sisi TERBESAR dengan
+     * jelas lebih mudah dibaca: pada prisma sisi itu adalah penampangnya, dan
+     * penampang yang terbaca membuat bentuknya langsung dikenali.
+     */
+    function nilai(yaw, pitch) {
+      var M = anglesToMatrix(yaw, pitch);
+      var areas = [], luasUtama = 0;
+      for (var i = 0; i < solid.faces.length; i++) {
+        var f = solid.faces[i];
+        if (dot(matVec(M, f.normal), [0, 0, 1]) <= 1e-6) continue;
+        var a = shadowArea(f.poly, M);
+        areas.push(a);
+        if (f.index === utama) luasUtama = a;
+      }
+      if (!areas.length) return -1;
+      var total = 0, min = Infinity;
+      for (i = 0; i < areas.length; i++) { total += areas[i]; min = Math.min(min, areas[i]); }
+      // Keseimbangan diutamakan: tanpa itu, penilaian justru memilih tampilan
+      // yang membuat sisi terbesar mendominasi sampai sisi lain setipis garis —
+      // prisma segitiga jadi terlihat seperti kartu terlipat. Bonus sisi terbesar
+      // dibuat jenuh di 0,5 supaya tidak bisa "dibeli" dengan mengorbankan yang lain.
+      return areas.length + 1.2 * (min / total) + 0.5 * Math.min(luasUtama / total, 0.5);
+    }
+
+    function sapu(y0, y1, langkahY, p0, p1, langkahP) {
+      for (var yaw = y0; yaw < y1; yaw += langkahY) {
+        for (var pitch = p0; pitch <= p1; pitch += langkahP) {
+          var s = nilai(((yaw % 360) + 360) % 360, pitch);
+          if (s > bestScore + 1e-9) {
+            bestScore = s;
+            best = { yaw: yaw, pitch: pitch };
+          }
         }
       }
     }
+
+    // Sapuan kasar lalu dipertajam di sekitar pemenangnya. Menyapu langsung
+    // dengan langkah 2 derajat butuh 3.780 pose per bangun — terasa lambat saat
+    // membuat seratus soal yang tiap nomornya berbentuk baru.
+    sapu(0, 360, 6, 6, 46, 3);
+    var ky = best.yaw, kp = best.pitch;
+    sapu(ky - 6, ky + 6, 2, Math.max(6, kp - 3), Math.min(46, kp + 3), 1);
+
+    if (best.yaw > 180) best.yaw -= 360;
+    if (best.yaw < -180) best.yaw += 360;
     return best;
   }
 
@@ -1151,10 +1175,19 @@
    * luas sisinya identik). Dipakai agar balok berukuran 1:1:1 tidak dijadikan
    * pengecoh untuk soal kubus.
    */
+  /**
+   * Sidik-sidik ini dipanggil ratusan kali per soal oleh pemilih pengecoh
+   * berbasis kemiripan, sedangkan menghitungnya berarti menyusun ulang seluruh
+   * poligon sisi. Hasilnya disimpan pada objek bangunnya (bangun tidak pernah
+   * berubah setelah dibangun), yang memangkas waktu pembuatan soal berkali lipat.
+   */
   function shapeKey(solid) {
-    return solid.faces.map(function (f) {
+    if (solid._sidikBentuk) return solid._sidikBentuk;
+    var k = solid.faces.map(function (f) {
       return f.sides + ':' + Math.round(f.area * 1000);
     }).sort().join('|');
+    try { solid._sidikBentuk = k; } catch (e) { /* objek beku */ }
+    return k;
   }
 
   // ---------------------------------------------------------------- bangun datar penyusun
@@ -1232,8 +1265,61 @@
       .sort(function (a, b) { return b.count - a.count || a.sides - b.sides; });
   }
 
+  /**
+   * Jarak kemiripan dua bangun ruang: 0 berarti kembar, makin besar makin berbeda.
+   *
+   * Dipakai untuk memilih PENGECOH yang menyerupai kunci. Pengecoh berupa limas
+   * untuk soal prisma langsung tercoret penjawab tanpa perlu berpikir; pengecoh
+   * yang jumlah sisi dan ukuran sisinya berdekatan memaksa penjawab benar-benar
+   * mencocokkan penampang dan menghitung sisinya.
+   */
+  /** daftar luas & jumlah rusuk tiap sisi, terurut — disimpan agar tidak dihitung ulang */
+  function profilSisi(s) {
+    if (s._profilSisi) return s._profilSisi;
+    var p = {
+      luas: s.faces.map(function (f) { return f.area; }).sort(function (x, y) { return y - x; }),
+      rusuk: s.faces.map(function (f) { return f.sides; }).sort(function (x, y) { return y - x; }),
+      rusukUtama: 0
+    };
+    var maks = -1;
+    s.faces.forEach(function (f) { if (f.area > maks) { maks = f.area; p.rusukUtama = f.sides; } });
+    try { s._profilSisi = p; } catch (e) { /* objek beku */ }
+    return p;
+  }
+
+  function kemiripan(a, b) {
+    var d = Math.abs(a.faces.length - b.faces.length) * 3;
+    var pa = profilSisi(a), pb = profilSisi(b);
+    var la = pa.luas, lb = pb.luas;
+    var n = Math.max(la.length, lb.length), i;
+    for (i = 0; i < n; i++) d += Math.abs((la[i] || 0) - (lb[i] || 0));
+
+    // Bentuk tiap sisi ikut dibandingkan, bukan cuma luasnya. Tanpa suku ini
+    // limas segilima dianggap dekat dengan kubus hanya karena sama-sama bersisi
+    // enam, padahal sisinya segitiga semua — penjawab langsung mencoretnya.
+    var sa = pa.rusuk, sb = pb.rusuk;
+    for (i = 0; i < n; i++) d += Math.abs((sa[i] || 0) - (sb[i] || 0)) * 1.2;
+
+    // jumlah rusuk pada sisi terbesar = bentuk penampang
+    d += Math.abs(pa.rusukUtama - pb.rusukUtama) * 0.8;
+
+    // susunan bangun datar yang sama membuat keduanya makin sulit dibedakan
+    if (compositionKey(a) === compositionKey(b)) d -= 0.5;
+    return d;
+  }
+
+  /** Urutkan kandidat dari yang paling mirip dengan `target`. */
+  function urutMirip(target, kandidat) {
+    return kandidat.map(function (k) {
+      return { k: k, d: kemiripan(target, k.solid || k) };
+    }).sort(function (x, y) { return x.d - y.d; }).map(function (x) { return x.k; });
+  }
+
   function compositionKey(solid) {
-    return composition(solid).map(function (c) { return c.count + '×' + c.key; }).sort().join('|');
+    if (solid._sidikSusunan) return solid._sidikSusunan;
+    var k = composition(solid).map(function (c) { return c.count + '×' + c.key; }).sort().join('|');
+    try { solid._sidikSusunan = k; } catch (e) { /* objek beku */ }
+    return k;
   }
 
   function compositionText(solid) {
@@ -1245,6 +1331,7 @@
     applyRotation: applyRotation, visibleFaces: visibleFaces, poseMatrix: poseMatrix,
     blankFaces: blankFaces, boundsOf: boundsOf, rotateCells: rotateCells, shapeKey: shapeKey,
     composition: composition, compositionKey: compositionKey, compositionText: compositionText,
+    kemiripan: kemiripan, urutMirip: urutMirip,
     faceShapeLabel: faceShapeLabel, facePoly2D: facePoly2D,
     symmetries: symmetries, isSpanningTree: isSpanningTree, treeKey: treeKey,
     polyOverlap: polyOverlap, unfold: unfold,

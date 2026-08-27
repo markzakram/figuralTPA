@@ -518,10 +518,21 @@
         var sd = Solids.build(id);
         _pool.push({ solid: sd, nets: Solids.nets(sd, 8) });
       });
-      for (var b = 1; b <= 14; b++) {
+      // Kolam bentuk tak beraturan dibuat cukup besar supaya untuk setiap bentuk
+      // selalu tersedia beberapa pembanding yang MIRIP — pengecoh yang mirip
+      // itulah yang membuat soal tidak bisa dijawab hanya dengan mencoret sekilas.
+      for (var b = 1; b <= 36; b++) {
         var sd = Solids.build('acak', { benih: b * 37 });
         _pool.push({ solid: sd, nets: Solids.nets(sd, 8) });
       }
+      // Beberapa balok dengan perbandingan berbeda. Tanpa ini, soal kubus hanya
+      // punya satu pembanding dekat (balok baku) dan tiga sisanya terpaksa
+      // diambil dari bangun yang jelas berbeda.
+      [{ p: 1, l: 1, t: 0.7 }, { p: 1, l: 0.85, t: 0.85 }, { p: 1, l: 0.7, t: 0.55 },
+       { p: 1.3, l: 1, t: 0.75 }, { p: 1.2, l: 1.2, t: 0.8 }].forEach(function (uk) {
+        var sd = Solids.build('balok', uk);
+        _pool.push({ solid: sd, nets: Solids.nets(sd, 8) });
+      });
     }
     // bangun yang sedang dipilih selalu versi terbaru (ukuran balok / benih bentuk)
     var kunci = Solids.shapeKey(state.solid);
@@ -687,7 +698,12 @@
       for (var i = 0; i < jumlah; i++) {
         if (tipeMode === 'campur') $('qtype').value = TIPE[i % TIPE.length];
 
-        if (variasi === 'artSolid') {
+        if (variasi === 'bentuk') {
+          // setiap soal memakai bentuk tak beraturan yang baru — sama seperti
+          // menekan "Acak bentuk" satu kali untuk tiap nomor
+          setSolid('acak', { benih: 1 + Math.floor(Math.random() * 99999) }, false);
+          state.faces = randomFaces();
+        } else if (variasi === 'artSolid') {
           var pilihId = ids[Math.floor(Math.random() * ids.length)];
           // tiap bentuk tak beraturan diambil dari benih baru, jadi tidak berulang
           setSolid(pilihId,
@@ -711,7 +727,11 @@
         addToBank(makeQuiz(alt), true);
 
         bar.value = i + 1;
-        if (i % 4 === 3) { batchStatus('Membuat soal ' + (i + 1) + '/' + jumlah + '…'); await jeda(); }
+        // Melepas kendali tiap 10 soal sudah cukup menjaga antarmuka tetap
+        // responsif (sekitar 40 ms sekali jeda). Menjeda tiap 4 soal membuat
+        // pembuatan paket besar bergantung pada ketepatan timer peramban, yang
+        // dicekik habis-habisan ketika tabnya sedang tidak ditampilkan.
+        if (i % 10 === 9) { batchStatus('Membuat soal ' + (i + 1) + '/' + jumlah + '…'); await jeda(); }
       }
       batchStatus(jumlah + ' soal ditambahkan. Total di bank: ' + state.bank.length + '.');
     } catch (e) {

@@ -308,9 +308,19 @@
     var warnings = [];
     var kunciBentuk = S.shapeKey(solid);
 
-    var lain = shuffle((pool || []).filter(function (k) {
-      return k.nets && k.nets.length && S.shapeKey(k.solid) !== kunciBentuk;
-    }), rnd);
+    var sudah = {};
+    sudah[kunciBentuk] = true;
+    var kandidat = (pool || []).filter(function (k) {
+      if (!k.nets || !k.nets.length) return false;
+      var s = S.shapeKey(k.solid);
+      if (sudah[s]) return false;      // buang yang kembar dengan kunci maupun sesama pengecoh
+      sudah[s] = true;
+      return true;
+    });
+    // Ambil dari sekumpulan bentuk PALING MIRIP, lalu diacak. Kalau pengecohnya
+    // jauh berbeda (mis. limas untuk soal prisma) penjawab bisa mencoretnya tanpa
+    // berpikir; yang mirip memaksa mencocokkan penampang dan menghitung sisi.
+    var lain = shuffle(S.urutMirip(solid, kandidat).slice(0, Math.max(count * 2, 8)), rnd);
 
     var items = [{
       kind: 'net', net: pick(nets, rnd), faces: solid.faces.map(function () { return { art: null, rot: 0 }; }),
@@ -427,12 +437,14 @@
     // dengan kunci — dua bentuk acak bisa kebetulan kongruen.
     var sudah = {};
     sudah[tKey] = true;
-    var pool = shuffle(others, rnd).filter(function (s) {
+    var kandidat = others.filter(function (s) {
       var k = S.shapeKey(s);
-      if (sudah[k]) return false;
+      if (sudah[k]) return false;      // kembar dengan kunci atau sesama pengecoh
       sudah[k] = true;
       return true;
     });
+    // pengecoh diambil dari bentuk yang paling menyerupai kunci
+    var pool = shuffle(S.urutMirip(target, kandidat).slice(0, Math.max(count * 2, 8)), rnd);
 
     var items = [{ kind: 'shape', solid: target, correct: true, reason: '' }];
     for (var i = 0; i < pool.length && items.length < count; i++) {
@@ -474,12 +486,14 @@
 
     var seen = {};
     seen[tKey] = true;
-    var pool = shuffle(others, rnd).filter(function (s) {
+    var kandidat = others.filter(function (s) {
       var k = S.compositionKey(s);
       if (seen[k]) return false;          // komposisinya sama dengan kunci -> bukan pengecoh
       seen[k] = true;
       return true;
     });
+    // susunan yang berdekatan (beda satu-dua sisi saja) jauh lebih menantang
+    var pool = shuffle(S.urutMirip(target, kandidat).slice(0, Math.max(count * 2, 8)), rnd);
 
     var items = [{
       kind: 'faces', solid: target, comp: S.composition(target),
