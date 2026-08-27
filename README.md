@@ -55,11 +55,29 @@ Selain kesembilan bangun baku, tersedia **bangun tak beraturan** yang dipakai
 Cocok untuk tipe B, C, dan D (tipe A butuh gambar sisi untuk membedakan orientasi,
 jadi pada paket campuran tipe A otomatis dialihkan).
 
-Bentuknya dibangkitkan, bukan digambar manual: sebuah **poliomino acak** (3–5 petak)
-ditelusuri tepinya menjadi penampang — menghasilkan profil L, T, U, S, tangga, atau
-balok bertakik — kadang satu sudutnya dipangkas miring, lalu diekstrusi. Tiap bentuk
-punya nomor benih; benih yang sama selalu menghasilkan bentuk yang sama, dan tombol
-*Acak bentuk* mengambil benih baru dari puluhan ribu kemungkinan.
+Bentuknya dibangkitkan, bukan digambar manual: sebuah **poliomino acak** (3–7 petak)
+ditelusuri tepinya menjadi penampang — menghasilkan profil L, V, T, U, atau balok
+bertakik — lalu diekstrusi. Tiap bentuk punya nomor benih; benih yang sama selalu
+menghasilkan bentuk yang sama, dan tombol *Acak bentuk* mengambil benih baru.
+Hasilnya sekitar **112 bangun berbeda** dari 53 penampang, masing-masing dengan
+~8 jaring-jaring, jadi ada ratusan pasangan bentuk × jaring yang bisa dipakai.
+
+Tiga batasan menjaga agar bentuknya tetap **terbaca**, karena bentuk acak yang
+terlalu bebas menghasilkan gambar yang tidak bisa dibayangkan lipatannya:
+
+| Batasan | Alasan |
+|---|---|
+| kotak pembatas penampang maksimal 4 petak, minimal 2 petak | penampang yang menjulur panjang membuat sisi tegaknya setipis garis |
+| penampang 6–8 rusuk | penampang berusuk 10+ berbentuk seperti sisir bergigi: di gambar 3D terbaca sebagai tumpukan bilah dan pita jaringnya memanjang jadi belasan kotak sempit |
+| tebal ekstrusi 0,7–1,3 kali penampang | kalau terlalu tipis, pita jaringnya memanjang seperti penggaris dan kedua tutupnya tampak kecil |
+
+**Jaring-jaringnya memakai tata letak pita.** Sisi tegak dibuka lurus menjadi satu
+pita mendatar, lalu kedua tutup ditempelkan pada sisi tegak yang dipilih — bentuk
+jaring prisma yang lazim di buku pelajaran. Pohon rentang acak (yang dipakai bangun
+lain) menghasilkan jaring yang menjalar menyerong dan sangat sulit dibayangkan
+lipatannya. Bangun baku tetap dicacah lengkap agar jumlah jaring bakunya tidak
+berkurang. Sudut pandang 3D-nya juga mengutamakan sisi terbesar — yaitu penampangnya —
+supaya profilnya langsung terbaca.
 
 Tiga bagian mesin harus diperbaiki agar bangun **cekung** tertangani benar:
 

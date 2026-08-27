@@ -369,18 +369,33 @@
     opsi = opsi || {};
     var rnd = mulberry32((benih | 0) || 1);
     var pts = null;
-    var petak = 3 + Math.floor(rnd() * 3);              // 3..5 petak
+    var petak = 3 + Math.floor(rnd() * 5);              // 3..7 petak
 
-    for (var coba = 0; coba < 60 && !pts; coba++) {
-      var gelang = gelangTepi(poliomino(rnd, petak));
+    for (var coba = 0; coba < 120 && !pts; coba++) {
+      var petakAcak = poliomino(rnd, petak);
+      // Kotak pembatas dibatasi 4 petak, dan bentuk selebar 1 petak ditolak.
+      // Penampang yang menjulur panjang menghasilkan petak yang sangat kecil
+      // setelah dinormalkan, dan pada jaring-jaring sisi tegaknya menjadi bilah
+      // setipis garis yang tidak terbaca lagi sebagai bangun datar.
+      var bx = petakAcak.map(function (q) { return q[0]; });
+      var by = petakAcak.map(function (q) { return q[1]; });
+      var lebarPetak = Math.max.apply(null, bx) - Math.min.apply(null, bx) + 1;
+      var tinggiPetak = Math.max.apply(null, by) - Math.min.apply(null, by) + 1;
+      if (Math.max(lebarPetak, tinggiPetak) > 4) continue;
+      if (Math.min(lebarPetak, tinggiPetak) < 2) continue;
+
+      var gelang = gelangTepi(petakAcak);
       if (!gelang) continue;
       var p = gabungSegaris(gelang);
-      if (p.length < 6 || p.length > 10) continue;      // batasi jumlah sisi tegak
+      // 6-8 rusuk saja. Penampang berusuk 10+ berbentuk seperti sisir bergigi:
+      // di gambar 3D terbaca sebagai tumpukan bilah, dan pita jaringnya memanjang
+      // menjadi belasan kotak sempit. Profil L, V, T, U, dan balok bertakik semuanya
+      // masuk dalam batas ini.
+      if (p.length < 6 || p.length > 8) continue;
       if (!poligonSederhana(p)) continue;
-      if (rnd() < 0.45) {
-        var q = pangkasSudut(p, rnd);
-        if (poligonSederhana(q)) p = q;
-      }
+      // Sudut tidak dipangkas miring: rusuk pendek menghasilkan sisi tegak setipis
+      // garis, dan pada jaring-jaring bentuk itu tidak terbaca lagi sebagai bangun
+      // datar. Semua rusuk penampang tetap kelipatan satu petak.
       pts = p;
     }
     if (!pts) pts = [[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]];   // profil L cadangan
@@ -393,7 +408,10 @@
       return [(p[0] - (x0 + x1) / 2) * k, (p[1] - (y0 + y1) / 2) * k];
     });
 
-    var tebal = opsi.tebal || (0.45 + Math.floor(rnd() * 4) * 0.22);
+    // Tebal dijaga sebanding dengan penampang (yang sudah dinormalkan ke 1).
+    // Kalau terlalu tipis, pita jaring memanjang seperti penggaris dan kedua
+    // tutupnya tampak kecil sehingga bentuknya sulit dibayangkan.
+    var tebal = opsi.tebal || (0.7 + Math.floor(rnd() * 4) * 0.2);
     var n = datar.length, verts = [], faces = [], i;
     for (i = 0; i < n; i++) verts.push([datar[i][0], -tebal / 2, datar[i][1]]);
     for (i = 0; i < n; i++) verts.push([datar[i][0], tebal / 2, datar[i][1]]);
@@ -451,6 +469,7 @@
     acak: {
       name: 'Bangun tak beraturan', short: 'Tak beraturan', pose: 'auto', projection: 'ortho',
       polos: true,                       // dipakai tanpa gambar sisi
+      pita: true,                        // jaring-jaring disusun sebagai pita agar terbaca
       params: { benih: 1 },
       paramInfo: [{ key: 'benih', label: 'Bentuk ke-', min: 1, max: 99999, step: 1, bulat: true }],
       build: function (q) { return irregularSolid(q.benih); }
@@ -560,6 +579,7 @@
     var solid = {
       id: id, name: def.name, short: def.short || def.name, verts: verts, faces: faces,
       polos: !!def.polos,                // bangun yang memang dipakai tanpa gambar sisi
+      pita: !!def.pita,
       params: q, paramInfo: def.paramInfo || null,
       pose: def.pose, projection: def.projection
     };
@@ -915,10 +935,92 @@
     return h >>> 0;
   }
 
+  /**
+   * Struktur prisma: dua tutup sebangun + segelang sisi tegak segiempat.
+   * Mengembalikan { tutup:[a,b], gelang:[...urut keliling] } atau null.
+   */
+  function strukturPrisma(solid) {
+    var tutup = [], gelang = [];
+    solid.faces.forEach(function (f) {
+      if (f.sides === 4) gelang.push(f.index); else tutup.push(f.index);
+    });
+    if (tutup.length !== 2 || gelang.length < 3) return null;
+    if (solid.faces[tutup[0]].sides !== gelang.length) return null;
+
+    // urutkan sisi tegak mengikuti keliling
+    var tetangga = {};
+    gelang.forEach(function (i) { tetangga[i] = []; });
+    solid.edges.forEach(function (e) {
+      if (tetangga[e.a] && tetangga[e.b]) { tetangga[e.a].push(e.b); tetangga[e.b].push(e.a); }
+    });
+    if (!gelang.every(function (i) { return tetangga[i].length === 2; })) return null;
+
+    var urut = [gelang[0]], sebelum = -1;
+    while (urut.length < gelang.length) {
+      var kini = urut[urut.length - 1];
+      var maju = tetangga[kini].filter(function (x) { return x !== sebelum; })[0];
+      if (maju === undefined || urut.indexOf(maju) >= 0) return null;
+      sebelum = kini;
+      urut.push(maju);
+    }
+    return { tutup: tutup, gelang: urut };
+  }
+
+  /**
+   * Jaring-jaring prisma yang rapi: sisi tegak dibuka lurus menjadi satu PITA,
+   * lalu kedua tutup ditempelkan pada sisi tegak yang dipilih. Inilah bentuk
+   * jaring prisma yang lazim di buku pelajaran — jauh lebih terbaca daripada
+   * pohon rentang acak, yang menjalar menyerong dan sulit dibayangkan lipatannya.
+   * Variasinya tetap banyak: (jumlah sisi tegak)² pasangan titik tempel.
+   */
+  function netsPita(solid, limit) {
+    var st = strukturPrisma(solid);
+    if (!st) return null;
+    var rusukAntar = {};
+    solid.edges.forEach(function (e) {
+      rusukAntar[e.a + '-' + e.b] = e;
+      rusukAntar[e.b + '-' + e.a] = e;
+    });
+
+    var pita = [], i;
+    for (i = 0; i + 1 < st.gelang.length; i++) {
+      pita.push(rusukAntar[st.gelang[i] + '-' + st.gelang[i + 1]]);
+    }
+    if (pita.some(function (e) { return !e; })) return null;
+
+    var out = [], seen = {};
+    for (var a = 0; a < st.gelang.length && out.length < limit; a++) {
+      for (var b = 0; b < st.gelang.length && out.length < limit; b++) {
+        var e1 = rusukAntar[st.tutup[0] + '-' + st.gelang[a]];
+        var e2 = rusukAntar[st.tutup[1] + '-' + st.gelang[b]];
+        if (!e1 || !e2) continue;
+        var pohon = pita.concat([e1, e2]);
+        if (!isSpanningTree(solid.faces.length, pohon)) continue;
+        var key = treeKey(solid, pohon);
+        if (seen[key]) continue;
+        seen[key] = true;
+        var u = unfold(solid, pohon);
+        if (!u.ok) continue;
+        var cells = u.cells, bo = boundsOf(cells);
+        if (bo.h > bo.w + 1e-9) { cells = rotateCells(cells, 90); bo = boundsOf(cells); }
+        out.push({ cells: cells, bounds: bo, tree: pohon.slice(), key: key });
+      }
+    }
+    return out.length ? out : null;
+  }
+
   function nets(solid, limit) {
     limit = limit || 60;
     var E = solid.edges, nf = solid.faces.length, need = nf - 1;
     var seen = {}, out = [];
+
+    // Bangun tak beraturan memakai jaring PITA yang rapi. Prisma baku tetap
+    // dicacah lengkap supaya jumlah jaring bakunya tidak berkurang
+    // (prisma segitiga 9, prisma segienam 12, dan seterusnya).
+    if (solid.pita || hitungKombinasi(E.length, need) > 2e5) {
+      var pita = netsPita(solid, limit);
+      if (pita) return pita;
+    }
 
     function simpan(edges, key) {
       var u = unfold(solid, edges);
@@ -1011,16 +1113,26 @@
    */
   function choosePose(solid) {
     var best = { yaw: -30, pitch: 18 }, bestScore = -1;
+    // sisi terbesar = "wajah" bangun; kalau ia terbaca, bentuknya mudah dikenali
+    var utama = 0, luasMaks = -1;
+    solid.faces.forEach(function (f) { if (f.area > luasMaks) { luasMaks = f.area; utama = f.index; } });
     for (var yaw = 0; yaw < 360; yaw += 2) {
       for (var pitch = 6; pitch <= 46; pitch += 2) {
         var M = anglesToMatrix(yaw, pitch);
-        var areas = [];
+        var areas = [], luasUtama = 0;
         solid.faces.forEach(function (f) {
-          if (dot(matVec(M, f.normal), [0, 0, 1]) > 1e-6) areas.push(shadowArea(f.poly, M));
+          if (dot(matVec(M, f.normal), [0, 0, 1]) <= 1e-6) return;
+          var a = shadowArea(f.poly, M);
+          areas.push(a);
+          if (f.index === utama) luasUtama = a;
         });
         if (!areas.length) continue;
         var total = areas.reduce(function (a, b) { return a + b; }, 0);
-        var score = areas.length + Math.min.apply(null, areas) / total;
+        // Selain jumlah sisi dan keseimbangan, tampilan yang memperlihatkan sisi
+        // TERBESAR dengan jelas lebih mudah dibaca: pada prisma, sisi itu adalah
+        // penampangnya, dan penampang yang terbaca membuat bentuk langsung dikenali.
+        var score = areas.length + 0.5 * (Math.min.apply(null, areas) / total)
+          + 0.8 * (luasUtama / total);
         if (score > bestScore + 1e-9) {
           bestScore = score;
           best = { yaw: yaw > 180 ? yaw - 360 : yaw, pitch: pitch };
@@ -1136,7 +1248,7 @@
     faceShapeLabel: faceShapeLabel, facePoly2D: facePoly2D,
     symmetries: symmetries, isSpanningTree: isSpanningTree, treeKey: treeKey,
     polyOverlap: polyOverlap, unfold: unfold,
-    irregularSolid: irregularSolid, mulberry32: mulberry32,
+    irregularSolid: irregularSolid, mulberry32: mulberry32, strukturPrisma: strukturPrisma,
     poligonSederhana: poligonSederhana, signedVolume: signedVolume,
     anglesToMatrix: anglesToMatrix, choosePose: choosePose, orthonormalize: orthonormalize,
     matVec: matVec, matMul: matMul, det: det, dot: dot, cross: cross, unit: unit,
