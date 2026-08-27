@@ -93,6 +93,74 @@
     }
     return unit(n);
   }
+  /**
+   * Volume bertanda sebuah polihedron tertutup (teorema divergensi).
+   * Positif bila urutan simpul tiap sisi menghadap keluar.
+   */
+  function signedVolume(verts, faces) {
+    var v = 0;
+    faces.forEach(function (f) {
+      var p = f.v.map(function (k) { return verts[k]; });
+      for (var i = 1; i < p.length - 1; i++) {
+        v += dot(p[0], cross(sub(p[i], p[0]), sub(p[i + 1], p[0]))) / 6;
+      }
+    });
+    return v;
+  }
+
+  /**
+   * Seragamkan urutan simpul seluruh sisi lalu hadapkan keluar.
+   *
+   * Dua sisi bertetangga disebut seragam bila rusuk bersamanya ditelusuri ke arah
+   * BERLAWANAN oleh keduanya. Penyeragaman disebar lewat graf ketetanggaan, baru
+   * setelah itu tanda volume menentukan apakah seluruhnya perlu dibalik.
+   * Cara ini sah untuk bangun cekung — patokan lama ("normal menjauhi pusat")
+   * hanya benar untuk bangun cembung.
+   */
+  function orientasiSeragam(verts, faces) {
+    var idx = faces.map(function (f) { return f.v.slice(); });
+    var jml = idx.length, i, j;
+
+    function arah(list, u, v) {
+      for (var k = 0; k < list.length; k++) {
+        var a = list[k], b = list[(k + 1) % list.length];
+        if (a === u && b === v) return 1;
+        if (a === v && b === u) return -1;
+      }
+      return 0;
+    }
+
+    var tetangga = [];
+    for (i = 0; i < jml; i++) tetangga.push([]);
+    for (i = 0; i < jml; i++) {
+      for (j = i + 1; j < jml; j++) {
+        var sama = idx[i].filter(function (k) { return idx[j].indexOf(k) >= 0; });
+        if (sama.length !== 2) continue;
+        // dua simpul bersama belum tentu rusuk pada kedua sisi
+        if (!arah(idx[i], sama[0], sama[1]) || !arah(idx[j], sama[0], sama[1])) continue;
+        tetangga[i].push({ ke: j, u: sama[0], v: sama[1] });
+        tetangga[j].push({ ke: i, u: sama[0], v: sama[1] });
+      }
+    }
+
+    var lihat = [], antre = [0];
+    lihat[0] = true;
+    while (antre.length) {
+      var a = antre.shift();
+      for (var t = 0; t < tetangga[a].length; t++) {
+        var e = tetangga[a][t];
+        if (lihat[e.ke]) continue;
+        lihat[e.ke] = true;
+        if (arah(idx[a], e.u, e.v) === arah(idx[e.ke], e.u, e.v)) idx[e.ke].reverse();
+        antre.push(e.ke);
+      }
+    }
+
+    var bungkus = idx.map(function (v) { return { v: v }; });
+    if (signedVolume(verts, bungkus) < 0) idx.forEach(function (v) { v.reverse(); });
+    return idx;
+  }
+
   function polyArea(vs, n) {
     var s = 0;
     for (var i = 1; i < vs.length - 1; i++) {
@@ -165,6 +233,180 @@
     return { verts: verts, faces: faces };
   }
 
+  // ---------------------------------------------------------------- bentuk tak beraturan
+
+  /** PRNG deterministik: bentuk yang sama selalu lahir dari benih yang sama. */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  /** Kumpulan petak yang saling menempel sisi (poliomino). */
+  function poliomino(rnd, jumlah) {
+    var ada = { '0,0': true }, daftar = [[0, 0]];
+    var aman = 0;
+    while (daftar.length < jumlah && aman++ < 500) {
+      var dasar = daftar[Math.floor(rnd() * daftar.length)];
+      var arah = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(rnd() * 4)];
+      var x = dasar[0] + arah[0], y = dasar[1] + arah[1], k = x + ',' + y;
+      if (ada[k]) continue;
+      ada[k] = true;
+      daftar.push([x, y]);
+    }
+    return daftar;
+  }
+
+  /**
+   * Telusuri tepi luar poliomino menjadi satu gelang poligon.
+   * Rusuk dalam muncul dua kali dengan arah berlawanan sehingga saling meniadakan;
+   * sisanya adalah tepi luar. Mengembalikan null bila tepinya bukan satu gelang
+   * tunggal (ada lubang atau titik jepit), supaya bentuk yang tak bisa dilipat
+   * langsung dibuang alih-alih menghasilkan jaring-jaring rusak.
+   */
+  function gelangTepi(petak) {
+    var rusuk = {}, i;
+    petak.forEach(function (p) {
+      var x = p[0], y = p[1];
+      var sisi = [
+        [[x, y], [x + 1, y]], [[x + 1, y], [x + 1, y + 1]],
+        [[x + 1, y + 1], [x, y + 1]], [[x, y + 1], [x, y]]
+      ];
+      sisi.forEach(function (r) {
+        var maju = r[0] + '>' + r[1], mundur = r[1] + '>' + r[0];
+        if (rusuk[mundur]) delete rusuk[mundur];
+        else rusuk[maju] = r;
+      });
+    });
+
+    var kunci = Object.keys(rusuk);
+    if (!kunci.length) return null;
+
+    var dari = {}, jepit = false;
+    kunci.forEach(function (k) {
+      var r = rusuk[k], a = r[0].join(',');
+      if (dari[a]) jepit = true;          // dua rusuk keluar dari titik sama = titik jepit
+      dari[a] = r;
+    });
+    if (jepit) return null;
+
+    var mulai = rusuk[kunci[0]][0], titik = [mulai], kini = mulai, aman = 0;
+    while (aman++ < 400) {
+      var r = dari[kini.join(',')];
+      if (!r) return null;
+      kini = r[1];
+      if (kini[0] === mulai[0] && kini[1] === mulai[1]) break;
+      titik.push(kini);
+    }
+    if (titik.length !== kunci.length) return null;   // bukan satu gelang tunggal
+    return titik;
+  }
+
+  /** Gabungkan rusuk yang segaris agar poligonnya ringkas. */
+  function gabungSegaris(pts) {
+    var out = [];
+    for (var i = 0; i < pts.length; i++) {
+      var a = pts[(i - 1 + pts.length) % pts.length], b = pts[i], c = pts[(i + 1) % pts.length];
+      var silang = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+      if (Math.abs(silang) > 1e-9) out.push(b);
+    }
+    return out;
+  }
+
+  /** Poligon sederhana: tidak ada rusuk tak bertetangga yang berpotongan. */
+  function poligonSederhana(pts) {
+    function arah(a, b, c) {
+      var v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      return Math.abs(v) < 1e-9 ? 0 : (v > 0 ? 1 : -1);
+    }
+    function potong(p1, p2, p3, p4) {
+      var d1 = arah(p3, p4, p1), d2 = arah(p3, p4, p2);
+      var d3 = arah(p1, p2, p3), d4 = arah(p1, p2, p4);
+      return d1 !== d2 && d3 !== d4;
+    }
+    var n = pts.length;
+    for (var i = 0; i < n; i++) {
+      for (var j = i + 1; j < n; j++) {
+        if ((i + 1) % n === j || (j + 1) % n === i) continue;
+        if (potong(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n])) return false;
+      }
+    }
+    return true;
+  }
+
+  /** Pangkas satu sudut menjadi bidang miring — memberi kesan bentuk "terpotong". */
+  function pangkasSudut(pts, rnd) {
+    var urut = pts.map(function (_, i) { return i; });
+    for (var t = urut.length - 1; t > 0; t--) {
+      var r = Math.floor(rnd() * (t + 1)), tmp = urut[t]; urut[t] = urut[r]; urut[r] = tmp;
+    }
+    for (var q = 0; q < urut.length; q++) {
+      var i = urut[q], n = pts.length;
+      var a = pts[(i - 1 + n) % n], b = pts[i], c = pts[(i + 1) % n];
+      var pa = Math.sqrt(Math.pow(b[0] - a[0], 2) + Math.pow(b[1] - a[1], 2));
+      var pc = Math.sqrt(Math.pow(c[0] - b[0], 2) + Math.pow(c[1] - b[1], 2));
+      if (pa < 0.9 || pc < 0.9) continue;
+      var f = 0.34 + rnd() * 0.22;
+      var baru = pts.slice(0, i).concat([
+        [b[0] + (a[0] - b[0]) * f, b[1] + (a[1] - b[1]) * f],
+        [b[0] + (c[0] - b[0]) * f, b[1] + (c[1] - b[1]) * f]
+      ], pts.slice(i + 1));
+      if (poligonSederhana(baru)) return baru;
+    }
+    return pts;
+  }
+
+  /**
+   * Bangun tak beraturan: penampang poliomino acak (profil L, T, U, S, tangga,
+   * balok bertakik) yang diekstrusi, kadang dengan satu sudut dipangkas miring.
+   * Sisi datarnya tetap poligon sederhana sehingga seluruh mesin — orientasi,
+   * simetri, pembukaan, penggambaran — tetap berlaku.
+   */
+  function irregularSolid(benih, opsi) {
+    opsi = opsi || {};
+    var rnd = mulberry32((benih | 0) || 1);
+    var pts = null;
+    var petak = 3 + Math.floor(rnd() * 3);              // 3..5 petak
+
+    for (var coba = 0; coba < 60 && !pts; coba++) {
+      var gelang = gelangTepi(poliomino(rnd, petak));
+      if (!gelang) continue;
+      var p = gabungSegaris(gelang);
+      if (p.length < 6 || p.length > 10) continue;      // batasi jumlah sisi tegak
+      if (!poligonSederhana(p)) continue;
+      if (rnd() < 0.45) {
+        var q = pangkasSudut(p, rnd);
+        if (poligonSederhana(q)) p = q;
+      }
+      pts = p;
+    }
+    if (!pts) pts = [[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]];   // profil L cadangan
+
+    var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+    var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var k = 1 / Math.max(x1 - x0, y1 - y0);
+    var datar = pts.map(function (p) {
+      return [(p[0] - (x0 + x1) / 2) * k, (p[1] - (y0 + y1) / 2) * k];
+    });
+
+    var tebal = opsi.tebal || (0.45 + Math.floor(rnd() * 4) * 0.22);
+    var n = datar.length, verts = [], faces = [], i;
+    for (i = 0; i < n; i++) verts.push([datar[i][0], -tebal / 2, datar[i][1]]);
+    for (i = 0; i < n; i++) verts.push([datar[i][0], tebal / 2, datar[i][1]]);
+
+    faces.push({ v: datar.map(function (_, j) { return j; }), name: 'Alas' });
+    faces.push({ v: datar.map(function (_, j) { return n + j; }), name: 'Tutup' });
+    for (i = 0; i < n; i++) {
+      var j2 = (i + 1) % n;
+      faces.push({ v: [i, j2, n + j2, n + i], name: 'Sisi ' + (i + 1) });
+    }
+    return { verts: verts, faces: faces };
+  }
+
   var CATALOG = {
     kubus: {
       name: 'Kubus', short: 'Kubus', faceCount: 6, pose: null, projection: 'oblique',
@@ -206,6 +448,13 @@
       name: 'Limas segienam', short: 'Limas 6', faceCount: 7, pose: 'auto', projection: 'ortho',
       build: function () { return pyramidSolid(6, 0.62, 0.98); }
     },
+    acak: {
+      name: 'Bangun tak beraturan', short: 'Tak beraturan', pose: 'auto', projection: 'ortho',
+      polos: true,                       // dipakai tanpa gambar sisi
+      params: { benih: 1 },
+      paramInfo: [{ key: 'benih', label: 'Bentuk ke-', min: 1, max: 99999, step: 1, bulat: true }],
+      build: function (q) { return irregularSolid(q.benih); }
+    },
     limas3: {
       // bidang empat beraturan: tinggi = r*akar(2) membuat keempat sisinya kongruen,
       // sehingga grup rotasinya 12 (bukan 3) dan soal jadi jauh lebih bervariasi
@@ -216,18 +465,18 @@
 
   // ---------------------------------------------------------------- menyusun solid
 
-  /** apakah titik (a,b) berada di dalam poligon cembung yang simpulnya sudah 2D */
-  function insideConvex(poly2, a, b) {
-    var sign = 0;
-    for (var i = 0; i < poly2.length; i++) {
-      var p = poly2[i], q = poly2[(i + 1) % poly2.length];
-      var cr = (q[0] - p[0]) * (b - p[1]) - (q[1] - p[1]) * (a - p[0]);
-      if (Math.abs(cr) < 1e-9) continue;
-      var s = cr > 0 ? 1 : -1;
-      if (sign === 0) sign = s;
-      else if (s !== sign) return false;
+  /**
+   * Apakah titik (a,b) berada di dalam poligon 2D. Memakai pancaran sinar
+   * (ray casting) supaya tetap benar untuk sisi CEKUNG — bangun tak beraturan
+   * seperti profil L atau balok bertakik punya sisi semacam itu.
+   */
+  function insidePoly(poly2, a, b) {
+    var di = false;
+    for (var i = 0, j = poly2.length - 1; i < poly2.length; j = i++) {
+      var xi = poly2[i][0], yi = poly2[i][1], xj = poly2[j][0], yj = poly2[j][1];
+      if ((yi > b) !== (yj > b) && a < (xj - xi) * (b - yi) / (yj - yi) + xi) di = !di;
     }
-    return true;
+    return di;
   }
 
   /**
@@ -246,20 +495,38 @@
     var cb = vs.length === 3 ? 0 : (bmin + bmax) / 2;
     var full = Math.min(amax - amin, bmax - bmin);
 
-    function fits(s) {
+    function muat(pa, pb, s) {
       var h = s / 2;
-      return [[ca - h, cb - h], [ca + h, cb - h], [ca + h, cb + h], [ca - h, cb + h]]
-        .every(function (p) { return insideConvex(poly2, p[0], p[1]); });
+      return [[pa - h, pb - h], [pa + h, pb - h], [pa + h, pb + h], [pa - h, pb + h]]
+        .every(function (p) { return insidePoly(poly2, p[0], p[1]); });
     }
-    var s = full;
-    if (!fits(s)) {
+    function terbesar(pa, pb) {
+      if (muat(pa, pb, full)) return full;
       var lo = 0, hi = full;
-      for (var k = 0; k < 24; k++) {
+      for (var k = 0; k < 22; k++) {
         var mid = (lo + hi) / 2;
-        if (fits(mid)) lo = mid; else hi = mid;
+        if (muat(pa, pb, mid)) lo = mid; else hi = mid;
       }
-      s = lo * 0.985;   // sisakan sedikit ruang dari rusuk
+      return lo * 0.985;      // sisakan sedikit ruang dari rusuk
     }
+
+    var s = terbesar(ca, cb);
+    // Pada sisi CEKUNG (mis. penampang profil L) titik tengah kotak pembatas bisa
+    // berada di LUAR bangun, sehingga tidak ada kotak yang muat sama sekali.
+    // Kalau begitu, cari titik pusat lain lewat penyisiran kisi.
+    if (s < full * 0.12) {
+      var langkah = 12;
+      for (var i = 1; i < langkah; i++) {
+        for (var j = 1; j < langkah; j++) {
+          var pa = amin + (amax - amin) * i / langkah;
+          var pb = bmin + (bmax - bmin) * j / langkah;
+          if (!insidePoly(poly2, pa, pb)) continue;
+          var t = terbesar(pa, pb);
+          if (t > s) { s = t; ca = pa; cb = pb; }
+        }
+      }
+    }
+
     var o = add(ctr, add(mul(right, ca - s / 2), mul(up, cb + s / 2)));
     return { o: o, U: mul(right, s), V: mul(up, -s), size: s };
   }
@@ -274,16 +541,12 @@
     var c = centroid(raw.verts);
     var verts = raw.verts.map(function (v) { return sub(v, c); });
 
+    var urut = orientasiSeragam(verts, raw.faces);
+
     var faces = raw.faces.map(function (f, i) {
-      var idx = f.v.slice();
+      var idx = urut[i];
       var vs = idx.map(function (k) { return verts[k]; });
       var n = polyNormal(vs);
-      // solid cembung berpusat di titik asal: normal keluar bila searah pusat sisi
-      if (dot(n, centroid(vs)) < 0) {
-        idx.reverse();
-        vs = idx.map(function (k) { return verts[k]; });
-        n = neg(n);
-      }
       var fr = (raw.frames && raw.frames[i]) || null;
       var right = fr ? unit(fr.right) : unit(sub(vs[1], vs[0]));
       var up = fr ? unit(fr.up) : unit(cross(n, right));
@@ -296,6 +559,7 @@
 
     var solid = {
       id: id, name: def.name, short: def.short || def.name, verts: verts, faces: faces,
+      polos: !!def.polos,                // bangun yang memang dipakai tanpa gambar sisi
       params: q, paramInfo: def.paramInfo || null,
       pose: def.pose, projection: def.projection
     };
@@ -512,10 +776,42 @@
     return [a * P.d2[0] + b * P.p2[0], a * P.d2[1] + b * P.p2[1]];
   }
 
-  /** uji tumpang tindih dua poligon cembung (SAT); poligon dikecilkan agar sisi bersinggungan tidak dihitung */
+  /**
+   * Uji tumpang tindih dua poligon SEDERHANA — cembung maupun cekung.
+   *
+   * Dua poligon bertindihan bila ada rusuk yang berpotongan, atau bila salah satu
+   * seluruhnya berada di dalam yang lain. Uji SAT yang lama hanya sahih untuk
+   * poligon cembung: pada tutup bangun tak beraturan yang cekung ia melaporkan
+   * tindihan palsu sehingga jaring-jaring yang sebenarnya sah ikut terbuang.
+   * Poligon dikecilkan dulu agar rusuk yang bersinggungan tidak dihitung.
+   */
+  function segmenPotong(p1, p2, p3, p4) {
+    function arah(a, b, c) {
+      var v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      return Math.abs(v) < 1e-12 ? 0 : (v > 0 ? 1 : -1);
+    }
+    return arah(p3, p4, p1) !== arah(p3, p4, p2) && arah(p1, p2, p3) !== arah(p1, p2, p4);
+  }
+
+  function titikDalam(poly, x, y) {
+    var di = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) di = !di;
+    }
+    return di;
+  }
+
   function polyOverlap(A, B) {
-    var a = shrink(A, 0.94), b = shrink(B, 0.94);
-    return satOverlap(a, b) && satOverlap(b, a);
+    var a = shrink(A, 0.94), b = shrink(B, 0.94), i, j;
+    for (i = 0; i < a.length; i++) {
+      for (j = 0; j < b.length; j++) {
+        if (segmenPotong(a[i], a[(i + 1) % a.length], b[j], b[(j + 1) % b.length])) return true;
+      }
+    }
+    if (titikDalam(b, a[0][0], a[0][1])) return true;
+    if (titikDalam(a, b[0][0], b[0][1])) return true;
+    return false;
   }
   function shrink(poly, k) {
     var cx = 0, cy = 0;
@@ -588,35 +884,81 @@
    * Semua jaring-jaring berbeda dari sebuah bangun ruang.
    * Satu wakil per orbit simetri, yang tumpang tindih dibuang.
    */
+  /** Satu pohon rentang acak lewat Kruskal pada urutan rusuk yang diacak. */
+  function pohonAcak(nf, E, rnd) {
+    var urut = E.map(function (_, i) { return i; });
+    for (var i = urut.length - 1; i > 0; i--) {
+      var j = Math.floor(rnd() * (i + 1)), t = urut[i]; urut[i] = urut[j]; urut[j] = t;
+    }
+    var induk = [];
+    for (i = 0; i < nf; i++) induk.push(i);
+    function cari(x) { while (induk[x] !== x) { induk[x] = induk[induk[x]]; x = induk[x]; } return x; }
+    var pilih = [];
+    for (i = 0; i < urut.length && pilih.length < nf - 1; i++) {
+      var e = E[urut[i]], ra = cari(e.a), rb = cari(e.b);
+      if (ra === rb) continue;
+      induk[ra] = rb;
+      pilih.push(e);
+    }
+    return pilih.length === nf - 1 ? pilih : null;
+  }
+
+  function hitungKombinasi(n, k) {
+    var r = 1;
+    for (var i = 0; i < k; i++) { r = r * (n - i) / (i + 1); if (r > 1e12) return r; }
+    return r;
+  }
+
+  function benihDari(teks) {
+    var h = 2166136261;
+    for (var i = 0; i < teks.length; i++) { h ^= teks.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+
   function nets(solid, limit) {
     limit = limit || 60;
     var E = solid.edges, nf = solid.faces.length, need = nf - 1;
     var seen = {}, out = [];
-    var idx = [];
-    for (var i = 0; i < need; i++) idx.push(i);
 
-    while (true) {
-      var edges = idx.map(function (k) { return E[k]; });
-      if (isSpanningTree(nf, edges)) {
-        var key = treeKey(solid, edges);
-        if (!seen[key]) {
-          seen[key] = true;
-          var u = unfold(solid, edges);
-          if (u.ok) {
-            var cells = u.cells;
-            var b = boundsOf(cells);
-            if (b.h > b.w + 1e-9) { cells = rotateCells(cells, 90); b = boundsOf(cells); }
-            out.push({ cells: cells, bounds: b, tree: edges.slice(), key: key });
-          }
-        }
+    function simpan(edges, key) {
+      var u = unfold(solid, edges);
+      if (!u.ok) return;
+      var cells = u.cells;
+      var b = boundsOf(cells);
+      if (b.h > b.w + 1e-9) { cells = rotateCells(cells, 90); b = boundsOf(cells); }
+      out.push({ cells: cells, bounds: b, tree: edges.slice(), key: key });
+    }
+
+    // Ruang kombinasi tumbuh sangat cepat: bangun tak beraturan bisa mencapai
+    // C(27,10) ≈ 8 juta. Di atas ambang ini pohon rentang diambil secara acak
+    // (dengan benih tetap, jadi hasilnya tetap dapat diulang) alih-alih dicacah habis.
+    if (hitungKombinasi(E.length, need) > 2e5) {
+      var rnd = mulberry32(benihDari(solid.id + '|' + JSON.stringify(solid.params || {})));
+      var coba = 0, maks = limit * 120;
+      while (out.length < limit && coba++ < maks) {
+        var pohon = pohonAcak(nf, E, rnd);
+        if (!pohon) continue;
+        var k = treeKey(solid, pohon);
+        if (seen[k]) continue;
+        seen[k] = true;
+        simpan(pohon, k);
       }
-      if (out.length >= limit) break;
-      // kombinasi berikutnya
-      var p = need - 1;
-      while (p >= 0 && idx[p] === E.length - need + p) p--;
-      if (p < 0) break;
-      idx[p]++;
-      for (var j = p + 1; j < need; j++) idx[j] = idx[j - 1] + 1;
+    } else {
+      var idx = [];
+      for (var i = 0; i < need; i++) idx.push(i);
+      while (true) {
+        var edges = idx.map(function (k2) { return E[k2]; });
+        if (isSpanningTree(nf, edges)) {
+          var key = treeKey(solid, edges);
+          if (!seen[key]) { seen[key] = true; simpan(edges, key); }
+        }
+        if (out.length >= limit) break;
+        var p = need - 1;
+        while (p >= 0 && idx[p] === E.length - need + p) p--;
+        if (p < 0) break;
+        idx[p]++;
+        for (var j = p + 1; j < need; j++) idx[j] = idx[j - 1] + 1;
+      }
     }
 
     // yang paling "berimbang" lebih dulu — bentuk seperti salib/T muncul di awal daftar
@@ -721,12 +1063,31 @@
       .sort(function (a, b) { return a - b; }).join(',');
   }
 
+  /** Apakah poligon punya sudut cekung (bukan poligon beraturan/cembung). */
+  function poligonCekung(f) {
+    var p = facePoly2D(f), n = p.length, positif = false, negatif = false;
+    for (var i = 0; i < n; i++) {
+      var a = p[i], b = p[(i + 1) % n], c = p[(i + 2) % n];
+      var s = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+      if (s > 1e-9) positif = true;
+      if (s < -1e-9) negatif = true;
+    }
+    return positif && negatif;
+  }
+
+  var NAMA_SEGI = {
+    5: 'segilima', 6: 'segienam', 7: 'segitujuh', 8: 'segidelapan',
+    9: 'segisembilan', 10: 'segisepuluh', 11: 'segisebelas', 12: 'segidua belas'
+  };
+
   function faceShapeLabel(f) {
     var ls = edgeLengths(f).map(function (l) { return Math.round(l * 1000); });
     var beda = ls.filter(function (v, i) { return ls.indexOf(v) === i; }).length;
     if (f.sides === 3) return beda === 1 ? 'segitiga sama sisi' : (beda === 2 ? 'segitiga sama kaki' : 'segitiga');
-    if (f.sides === 4) return beda === 1 ? 'persegi' : 'persegi panjang';
-    return { 5: 'segilima', 6: 'segienam', 7: 'segitujuh', 8: 'segidelapan' }[f.sides] || 'segi-' + f.sides;
+    if (f.sides === 4 && !poligonCekung(f)) return beda === 1 ? 'persegi' : 'persegi panjang';
+    var nama = NAMA_SEGI[f.sides] || 'segi-' + f.sides;
+    // penampang bangun tak beraturan bertakik — bukan poligon beraturan
+    return poligonCekung(f) ? nama + ' tak beraturan' : nama;
   }
 
   /** Poligon sebuah sisi dalam koordinat bidangnya sendiri (y ke bawah, siap digambar). */
@@ -736,16 +1097,24 @@
     });
   }
 
-  /** Daftar bangun datar penyusun: bentuk berbeda beserta jumlahnya. */
+  /**
+   * Daftar bangun datar penyusun, dikelompokkan per JENIS bangun datar
+   * (persegi, persegi panjang, segitiga sama kaki, …) — bukan per ukuran.
+   * "Balok tersusun dari 6 persegi panjang" adalah jawaban yang dimaksud
+   * pelajaran, meski ketiga pasang persegi panjangnya berbeda ukuran. Tanpa
+   * pengelompokan ini, bangun tak beraturan akan terurai jadi belasan entri.
+   */
   function composition(solid) {
     var by = {}, order = [];
     solid.faces.forEach(function (f) {
-      var k = faceShapeKey(f);
+      var k = faceShapeLabel(f);
       if (!by[k]) {
-        by[k] = { key: k, label: faceShapeLabel(f), count: 0, poly: facePoly2D(f), sides: f.sides };
+        by[k] = { key: k, label: k, count: 0, poly: facePoly2D(f), sides: f.sides, luas: f.area };
         order.push(k);
       }
       by[k].count++;
+      // wakil gambar: ambil sisi terbesar agar bentuknya jelas terbaca
+      if (f.area > by[k].luas) { by[k].poly = facePoly2D(f); by[k].luas = f.area; }
     });
     return order.map(function (k) { return by[k]; })
       .sort(function (a, b) { return b.count - a.count || a.sides - b.sides; });
@@ -766,6 +1135,9 @@
     composition: composition, compositionKey: compositionKey, compositionText: compositionText,
     faceShapeLabel: faceShapeLabel, facePoly2D: facePoly2D,
     symmetries: symmetries, isSpanningTree: isSpanningTree, treeKey: treeKey,
+    polyOverlap: polyOverlap, unfold: unfold,
+    irregularSolid: irregularSolid, mulberry32: mulberry32,
+    poligonSederhana: poligonSederhana, signedVolume: signedVolume,
     anglesToMatrix: anglesToMatrix, choosePose: choosePose, orthonormalize: orthonormalize,
     matVec: matVec, matMul: matMul, det: det, dot: dot, cross: cross, unit: unit,
     add: add, sub: sub, mul: mul, neg: neg, norm360: norm360, centroid: centroid

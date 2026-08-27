@@ -86,6 +86,18 @@
     }
   }
 
+  function bacaParams() {
+    var info = Solids.CATALOG[state.solidId].paramInfo || [];
+    var p = {};
+    Array.prototype.forEach.call($('params').querySelectorAll('input[data-param]'), function (x) {
+      var def = info.filter(function (d) { return d.key === x.dataset.param; })[0] || {};
+      var lo = def.min != null ? def.min : 0.3, hi = def.max != null ? def.max : 2;
+      var v = parseFloat(x.value) || lo;
+      p[x.dataset.param] = Math.max(lo, Math.min(hi, def.bulat ? Math.round(v) : v));
+    });
+    return p;
+  }
+
   function gridCellList() {
     return Object.keys(state.grid).map(function (k) {
       var p = k.split(',');
@@ -128,9 +140,13 @@
         var val = state.solid.params[p.key];
         return '<label class="num-field" title="' + p.label + '"><span>' +
           (PARAM_SHORT[p.key] || p.label) + '</span>' +
-          '<input type="number" data-param="' + p.key + '" min="0.3" max="2" step="0.05" value="' +
-          (Math.round(val * 100) / 100) + '"></label>';
-      }).join('');
+          '<input type="number" data-param="' + p.key + '" min="' + (p.min != null ? p.min : 0.3) +
+          '" max="' + (p.max != null ? p.max : 2) + '" step="' + (p.step != null ? p.step : 0.05) +
+          '" value="' + (p.bulat ? Math.round(val) : Math.round(val * 100) / 100) + '"></label>';
+      }).join('') +
+        (state.solidId === 'acak'
+          ? '<button class="ghost" id="btn-bentuk-acak" type="button" title="Ambil bentuk tak beraturan lain">Acak bentuk</button>'
+          : '');
     }
     $('mode-switch').hidden = !boxLike();
     Array.prototype.forEach.call($('mode-switch').children, function (b) {
@@ -488,15 +504,34 @@
     $('answer-reveal').textContent = 'Kunci: ' + q.answerLetter + ' (' + q.describe + ').';
   }
 
-  var _allSolids = null;
-  function allSolids() {
-    if (!_allSolids) {
-      _allSolids = Object.keys(Solids.CATALOG).map(function (id) { return Solids.build(id); });
+  var _pool = null;
+  /**
+   * Kolam bangun pembanding: seluruh katalog + sejumlah bentuk tak beraturan.
+   * Dipakai sebagai sumber pengecoh untuk tipe B (polos), C, dan D. Dihitung
+   * sekali lalu disimpan karena mencari jaring-jaringnya memakan waktu.
+   */
+  function poolBentuk() {
+    if (!_pool) {
+      _pool = [];
+      Object.keys(Solids.CATALOG).forEach(function (id) {
+        if (id === 'acak') return;
+        var sd = Solids.build(id);
+        _pool.push({ solid: sd, nets: Solids.nets(sd, 8) });
+      });
+      for (var b = 1; b <= 14; b++) {
+        var sd = Solids.build('acak', { benih: b * 37 });
+        _pool.push({ solid: sd, nets: Solids.nets(sd, 8) });
+      }
     }
-    // pakai balok dengan ukuran yang sedang dipilih pengguna
-    return _allSolids.map(function (s) {
-      return s.id === state.solidId ? state.solid : s;
-    });
+    // bangun yang sedang dipilih selalu versi terbaru (ukuran balok / benih bentuk)
+    var kunci = Solids.shapeKey(state.solid);
+    return [{ solid: state.solid, nets: state.nets }].concat(
+      _pool.filter(function (p) { return Solids.shapeKey(p.solid) !== kunci; })
+    );
+  }
+
+  function allSolids() {
+    return poolBentuk().map(function (p) { return p.solid; });
   }
 
   /** Buat satu soal sesuai tipe yang dipilih, lengkap dengan pemeriksaan mandiri. */
@@ -504,7 +539,7 @@
     var type = $('qtype').value;
     var q, check;
     if (type === 'toNet') {
-      q = Quiz.generateNetChoice(state.solid, state.faces, state.nets, {});
+      q = Quiz.generateNetChoice(state.solid, state.faces, state.nets, { pool: poolBentuk() });
       check = Quiz.auditAlt(q);
     } else if (type === 'toFaces') {
       q = Quiz.generateFaceChoice(state.solid, allSolids(), {});
@@ -653,11 +688,20 @@
         if (tipeMode === 'campur') $('qtype').value = TIPE[i % TIPE.length];
 
         if (variasi === 'artSolid') {
-          setSolid(ids[Math.floor(Math.random() * ids.length)], null, false);
+          var pilihId = ids[Math.floor(Math.random() * ids.length)];
+          // tiap bentuk tak beraturan diambil dari benih baru, jadi tidak berulang
+          setSolid(pilihId,
+            pilihId === 'acak' ? { benih: 1 + Math.floor(Math.random() * 99999) } : null, false);
           state.faces = randomFaces();
         } else if (variasi === 'art') {
+          if (state.solidId === 'acak') {
+            setSolid('acak', { benih: 1 + Math.floor(Math.random() * 99999) }, false);
+          }
           state.faces = randomFaces();
         }
+        // bangun polos tidak punya gambar sisi, jadi tipe A (beda susunan gambar)
+        // tidak berlaku — dialihkan ke tipe yang menguji bentuk
+        if (state.solid.polos && $('qtype').value === 'toSolid') $('qtype').value = 'toNet';
         if (state.mode !== 'grid' && state.nets.length) {
           state.netIndex = Math.floor(Math.random() * state.nets.length);
         }
@@ -786,6 +830,10 @@
   }
 
   function randomFaces() {
+    // bangun tak beraturan memang dipakai polos — bentuknya sendiri yang jadi soal
+    if (state.solid.polos) {
+      return state.solid.faces.map(function () { return { art: Art.defaultArt(), rot: 0 }; });
+    }
     var pool = [
       { type: 'dice', n: 1 }, { type: 'dice', n: 2 }, { type: 'dice', n: 3 },
       { type: 'dice', n: 4 }, { type: 'dice', n: 5 }, { type: 'dice', n: 6 },
@@ -864,13 +912,14 @@
     });
 
     $('params').addEventListener('change', function (e) {
-      var inp = e.target.closest('input[data-param]');
-      if (!inp) return;
-      var p = {};
-      Array.prototype.forEach.call($('params').querySelectorAll('input[data-param]'), function (x) {
-        p[x.dataset.param] = Math.max(0.3, Math.min(2, parseFloat(x.value) || 1));
-      });
-      setSolid(state.solidId, p, true);
+      if (!e.target.closest('input[data-param]')) return;
+      setSolid(state.solidId, bacaParams(), true);
+      changed();
+    });
+
+    $('params').addEventListener('click', function (e) {
+      if (!e.target.closest('#btn-bentuk-acak')) return;
+      setSolid('acak', { benih: 1 + Math.floor(Math.random() * 99999) }, false);
       changed();
     });
 

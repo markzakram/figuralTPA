@@ -101,8 +101,18 @@
     var prefix = 'f' + (++uid) + '_';
     var body = [], defs = [];
 
-    sd.faces.forEach(function (f) {
-      if (S.dot(S.matVec(M, f.normal), proj.view) <= 1e-9) return;   // membelakangi penonton
+    // Sisi yang membelakangi penonton tidak pernah terlihat pada bangun tertutup,
+    // jadi tetap dibuang. Sisanya diurutkan dari yang terjauh: pada bangun CEKUNG
+    // (mis. balok bertakik) dua sisi yang sama-sama menghadap penonton bisa saling
+    // menutupi, dan urutan gambarlah yang menentukan mana yang tampak.
+    var tampak = sd.faces.filter(function (f) {
+      return S.dot(S.matVec(M, f.normal), proj.view) > 1e-9;
+    }).map(function (f) {
+      return { f: f, dalam: S.dot(S.matVec(M, f.center), proj.view) };
+    }).sort(function (a, b) { return a.dalam - b.dalam; });
+
+    tampak.forEach(function (item) {
+      var f = item.f;
       var poly = f.poly.map(function (v) { return proj.project(S.matVec(M, v)); });
       var o = proj.project(S.matVec(M, f.box.o));
       var pu = proj.project(S.matVec(M, S.add(f.box.o, f.box.U)));

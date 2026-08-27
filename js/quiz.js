@@ -290,8 +290,66 @@
    * @param {Array} faces isi tiap sisi
    * @param {Array} nets daftar jaring-jaring (hasil Solids.nets)
    */
+  /**
+   * Tipe B untuk bangun POLOS (tanpa gambar sisi).
+   *
+   * Karena semua sisi kosong, pengecoh tidak bisa dibuat dengan menukar gambar —
+   * yang membedakan hanyalah BENTUK. Jadi pengecohnya diambil dari jaring-jaring
+   * bangun lain yang susunan sisinya berbeda.
+   *
+   * Jaminan: hasil lipatan sebuah jaring-jaring pasti punya kumpulan sisi yang
+   * sama persis dengan jaring itu. Maka jaring milik bangun yang kumpulan sisinya
+   * berbeda MUSTAHIL terlipat menjadi bangun pada soal — tanpa perlu mencoba.
+   */
+  function netChoicePolos(solid, nets, pool, opts) {
+    opts = opts || {};
+    var rnd = opts.rnd || Math.random;
+    var count = opts.count || 5;
+    var warnings = [];
+    var kunciBentuk = S.shapeKey(solid);
+
+    var lain = shuffle((pool || []).filter(function (k) {
+      return k.nets && k.nets.length && S.shapeKey(k.solid) !== kunciBentuk;
+    }), rnd);
+
+    var items = [{
+      kind: 'net', net: pick(nets, rnd), faces: solid.faces.map(function () { return { art: null, rot: 0 }; }),
+      solidNet: solid, correct: true, reason: '', key: 'kunci'
+    }];
+
+    for (var i = 0; i < lain.length && items.length < count; i++) {
+      var k = lain[i];
+      items.push({
+        kind: 'net', net: pick(k.nets, rnd),
+        faces: k.solid.faces.map(function () { return { art: null, rot: 0 }; }),
+        solidNet: k.solid, correct: false, key: k.solid.id + ':' + i,
+        reason: 'itu jaring-jaring bangun lain — susunan sisinya ' + S.compositionText(k.solid) +
+          ', sedangkan bangun pada soal butuh ' + S.compositionText(solid)
+      });
+    }
+
+    if (items.length < count) {
+      warnings.push('Hanya tersedia ' + (items.length - 1) + ' bangun pembanding yang bentuknya berbeda.');
+    }
+
+    items = shuffle(items, rnd);
+    var answerIndex = -1;
+    items.forEach(function (it, n) { if (it.correct) answerIndex = n; });
+
+    return {
+      type: 'toNet', polos: true, solid: solid, faces: null, options: items,
+      answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
+      warnings: warnings, describe: S.compositionText(solid)
+    };
+  }
+
   function generateNetChoice(solid, faces, nets, opts) {
     opts = opts || {};
+    // bangun polos: bedanya hanya bentuk, jadi pengecoh diambil dari bangun lain
+    var polos = !faces || faces.every(function (f) { return Art.isBlank(f.art); });
+    if (polos && opts.pool && opts.pool.length) {
+      return netChoicePolos(solid, nets, opts.pool, opts);
+    }
     var rnd = opts.rnd || Math.random;
     var count = opts.count || 5;
     var warnings = [];
@@ -363,9 +421,18 @@
     var tKey = S.shapeKey(target);
 
     // buang bangun yang sebenarnya kongruen dengan jawaban (mis. balok 1:1:1 = kubus)
-    var pool = shuffle(others.filter(function (s) {
-      return s.id !== target.id && S.shapeKey(s) !== tKey;
-    }), rnd);
+    // Disaring HANYA lewat sidik bentuk, bukan id: semua bangun tak beraturan
+    // memakai id yang sama ('acak') padahal bentuknya berbeda-beda. Penyaringan
+    // juga membuang bentuk yang kembar SESAMA pengecoh, bukan hanya yang kembar
+    // dengan kunci — dua bentuk acak bisa kebetulan kongruen.
+    var sudah = {};
+    sudah[tKey] = true;
+    var pool = shuffle(others, rnd).filter(function (s) {
+      var k = S.shapeKey(s);
+      if (sudah[k]) return false;
+      sudah[k] = true;
+      return true;
+    });
 
     var items = [{ kind: 'shape', solid: target, correct: true, reason: '' }];
     for (var i = 0; i < pool.length && items.length < count; i++) {
@@ -452,7 +519,15 @@
   /** Pemeriksaan mandiri untuk soal tipe B dan C. */
   function auditAlt(quiz) {
     var validCount = 0, dupes = 0, seen = {};
-    if (quiz.type === 'toNet') {
+    if (quiz.type === 'toNet' && quiz.polos) {
+      // sah bila jaring itu memang milik bangun yang kumpulan sisinya sama
+      var kb = S.shapeKey(quiz.solid);
+      quiz.options.forEach(function (o) {
+        if (o.solidNet && S.shapeKey(o.solidNet) === kb) validCount++;
+        if (seen[o.key]) dupes++;
+        seen[o.key] = true;
+      });
+    } else if (quiz.type === 'toNet') {
       var trueSig = signature(quiz.solid, quiz.faces);
       quiz.options.forEach(function (o) {
         if (netIsValid(quiz.solid, trueSig, o.faces)) validCount++;
@@ -469,9 +544,10 @@
     } else {
       var tKey = S.shapeKey(quiz.solid);
       quiz.options.forEach(function (o) {
-        if (S.shapeKey(o.solid) === tKey) validCount++;
-        if (seen[o.solid.id]) dupes++;
-        seen[o.solid.id] = true;
+        var k = S.shapeKey(o.solid);
+        if (k === tKey) validCount++;
+        if (seen[k]) dupes++;
+        seen[k] = true;
       });
     }
     return {

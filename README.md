@@ -38,6 +38,7 @@ Tingkat kesulitan (mudah/sedang/sulit) berlaku untuk tipe A.
 | Limas segilima | 6 | 5 | 15 |
 | Limas segienam | 7 | 6 | 33 |
 | Limas segitiga (bidang empat) | 4 | 12 | **2** |
+| **Bangun tak beraturan** | 8–11 | 1–2 | ~10 per bentuk |
 
 Angka jaring-jaring yang ditebalkan cocok dengan hasil baku matematika — daftarnya
 **dihitung program**, bukan digambar manual, jadi tidak ada yang terlewat.
@@ -45,6 +46,40 @@ Angka jaring-jaring yang ditebalkan cocok dengan hasil baku matematika — dafta
 Tersedia **32 jenis gambar sisi**: mata dadu 1–6, huruf/angka, wajik, papan catur,
 bingkai, segitiga, panah, bintang, hati, bulan sabit, zigzag, segilima, segienam,
 dan lainnya — masing-masing dengan 9 pilihan warna gambar dan warna latar.
+
+
+## Bangun tak beraturan
+
+Selain kesembilan bangun baku, tersedia **bangun tak beraturan** yang dipakai
+**polos tanpa pola sisi** — yang diuji adalah bentuknya, bukan gambar pada sisinya.
+Cocok untuk tipe B, C, dan D (tipe A butuh gambar sisi untuk membedakan orientasi,
+jadi pada paket campuran tipe A otomatis dialihkan).
+
+Bentuknya dibangkitkan, bukan digambar manual: sebuah **poliomino acak** (3–5 petak)
+ditelusuri tepinya menjadi penampang — menghasilkan profil L, T, U, S, tangga, atau
+balok bertakik — kadang satu sudutnya dipangkas miring, lalu diekstrusi. Tiap bentuk
+punya nomor benih; benih yang sama selalu menghasilkan bentuk yang sama, dan tombol
+*Acak bentuk* mengambil benih baru dari puluhan ribu kemungkinan.
+
+Tiga bagian mesin harus diperbaiki agar bangun **cekung** tertangani benar:
+
+| Bagian | Cara lama (hanya sah untuk bangun cembung) | Cara sekarang |
+|---|---|---|
+| Arah normal sisi | "normal menjauhi pusat bangun" | urutan simpul diseragamkan lewat rusuk bersama, arah keluar ditentukan tanda volume |
+| Tumpang tindih saat membuka jaring | SAT (sumbu pemisah) | perpotongan rusuk + uji titik-dalam-poligon |
+| Titik dalam sisi (kotak gambar) | uji tanda hasil kali silang | pancaran sinar, plus penyisiran kisi bila pusat kotak jatuh di luar sisi |
+
+Penggambaran juga berubah: sisi yang tampak kini **diurutkan menurut kedalaman**,
+karena pada bangun bertakik dua sisi yang sama-sama menghadap penonton bisa saling
+menutupi. Pencacahan jaring-jaring beralih ke **pengambilan pohon rentang acak**
+(berbenih tetap, jadi tetap dapat diulang) ketika ruang kombinasinya melewati 2×10⁵ —
+tanpa itu satu bentuk bersisi 11 butuh 2,6 detik; sekarang 18 milidetik.
+
+**Pengecoh untuk bangun polos** tidak bisa dibuat dengan menukar gambar. Karena itu
+tipe B mengambil jaring-jaring milik bangun lain yang **susunan sisinya berbeda**.
+Jaminannya bersifat pasti tanpa perlu mencoba melipat: hasil lipatan sebuah
+jaring-jaring selalu punya kumpulan sisi yang sama persis dengan jaring itu, jadi
+jaring milik bangun dengan kumpulan sisi berbeda mustahil membentuk bangun pada soal.
 
 ## Alur pemakaian
 
