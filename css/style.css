@@ -251,6 +251,7 @@ progress { width: 100%; height: 5px; margin-top: 5px; }
 }
 .bank-item svg { display: block; max-width: 100%; height: auto; max-height: 150px; }
 .bank-meta { font-size: 11px; color: var(--muted); }
+.bank-tipe { color: var(--brand-dark); }
 .bank-key { font-weight: 700; color: var(--ink); font-size: 12px; }
 
 /* layar pendek (mis. laptop 768px): rapatkan agar tetap muat satu layar */

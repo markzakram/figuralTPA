@@ -75,7 +75,10 @@
     state.netIndex = 0;
     state.selected = 0;
     state.rotM = null;           // pratinjau kembali ke sudut baku bangun yang baru
-    if (!keepArt || state.faces.length !== state.solid.faces.length) {
+    // Bangun polos memang dipakai tanpa corak. Tanpa syarat ini, berpindah dari
+    // kubus bercorak ke bangun tak beraturan bersisi enam membawa serta mata dadunya,
+    // dan soal tipe A pun ikut terbentuk di bangun yang seharusnya polos.
+    if (!keepArt || state.solid.polos || state.faces.length !== state.solid.faces.length) {
       state.faces = state.solid.faces.map(function () {
         return { art: Art.defaultArt(), rot: 0 };
       });
@@ -616,9 +619,22 @@
 
   function generate() {
     var t = $('qtype').value;
+    // Bangun polos tidak punya gambar sisi, jadi tipe A tidak punya bahan pengecoh
+    // sama sekali — hasilnya soal berpilihan tunggal. Tipenya dialihkan, dan
+    // pengalihannya ditulis di panel peringatan supaya tidak terjadi diam-diam.
+    var catatan = '';
+    if (state.solid.polos && t === 'toSolid') {
+      t = 'toNet';
+      $('qtype').value = t;
+      $('difficulty').disabled = true;
+      catatan = 'Bangun tak beraturan dipakai tanpa corak sisi, jadi tipe ' +
+        '"jaring-jaring → bangun ruang" tidak berlaku. Soal ini dibuat sebagai ' +
+        '"bangun ruang → jaring-jaring".';
+    }
     // tipe yang soalnya menampilkan bangun 3D tidak butuh jaring yang sah
     if (t !== 'toNet' && t !== 'toFaces' && !netCells()) { flash('Jaring-jaring belum sah.'); return null; }
     state.quiz = makeQuiz();
+    if (catatan) state.quiz.warnings.unshift(catatan);
     renderQuiz();
     return state.quiz;
   }
@@ -752,7 +768,8 @@
     $('bank-count').textContent = state.bank.length;
     $('bank').innerHTML = state.bank.map(function (it, i) {
       return '<div class="bank-item"><div>' + it.sheet + '</div>' +
-        '<div><div class="bank-meta">Soal ' + (i + 1) + '<br>' + Art.esc(it.solid) + '</div>' +
+        '<div><div class="bank-meta">Soal ' + (i + 1) + '<br>' + Art.esc(it.solid) +
+        (it.tipe ? '<br><span class="bank-tipe">' + Art.esc(it.tipe) + '</span>' : '') + '</div>' +
         '<div class="bank-key">Kunci: ' + it.letter + '</div>' +
         '<button type="button" class="ghost danger" data-del="' + i + '">Hapus</button></div></div>';
     }).join('');
@@ -802,8 +819,19 @@
     batchStatus('Membuat soal…');
 
     try {
+      // Bangun polos tidak punya gambar sisi, jadi tipe A tidak berlaku untuknya.
+      // Kalau tipe yang diminta memang tipe A, bentuk polos tidak ikut diundi sama
+      // sekali — bukan dialihkan diam-diam ke tipe lain.
+      var idsBercorak = ids.filter(function (id) { return !Solids.CATALOG[id].polos; });
+      var dialihkan = 0;
+
       for (var i = 0; i < jumlah; i++) {
-        if (tipeMode === 'campur') $('qtype').value = TIPE[i % TIPE.length];
+        // Tipe ditetapkan ULANG tiap nomor. Sebelumnya nilainya hanya ditulis ke
+        // elemen <select> dan pengalihan "bangun polos -> toNet" di bawah menempel
+        // permanen: satu bentuk tak beraturan di nomor 7 membuat 93 soal sisanya
+        // ikut berbalik arah menjadi bangun ruang -> jaring-jaring.
+        var tipeSoal = tipeMode === 'campur' ? TIPE[i % TIPE.length] : asalTipe;
+        var perluCorak = tipeSoal === 'toSolid';
 
         if (variasi === 'bentuk') {
           // setiap soal memakai bentuk tak beraturan yang baru — sama seperti
@@ -811,7 +839,8 @@
           setSolid('acak', { benih: 1 + Math.floor(Math.random() * 99999) }, false);
           state.faces = randomFaces();
         } else if (variasi === 'artSolid') {
-          var pilihId = ids[Math.floor(Math.random() * ids.length)];
+          var kolamId = perluCorak ? idsBercorak : ids;
+          var pilihId = kolamId[Math.floor(Math.random() * kolamId.length)];
           // tiap bentuk tak beraturan diambil dari benih baru, jadi tidak berulang
           setSolid(pilihId,
             pilihId === 'acak' ? { benih: 1 + Math.floor(Math.random() * 99999) } : null, false);
@@ -822,9 +851,10 @@
           }
           state.faces = randomFaces();
         }
-        // bangun polos tidak punya gambar sisi, jadi tipe A (beda susunan gambar)
-        // tidak berlaku — dialihkan ke tipe yang menguji bentuk
-        if (state.solid.polos && $('qtype').value === 'toSolid') $('qtype').value = 'toNet';
+        // masih mungkin tersisa bentuk polos: variasi "Acak bentuk" memang selalu
+        // memakainya, begitu pula kalau editor sedang memilih bentuk tak beraturan
+        if (state.solid.polos && tipeSoal === 'toSolid') { tipeSoal = 'toNet'; dialihkan++; }
+        $('qtype').value = tipeSoal;
         if (state.mode !== 'grid' && state.nets.length) {
           state.netIndex = indeksJaringAcak();
         }
@@ -840,7 +870,12 @@
         // dicekik habis-habisan ketika tabnya sedang tidak ditampilkan.
         if (i % 10 === 9) { batchStatus('Membuat soal ' + (i + 1) + '/' + jumlah + '…'); await jeda(); }
       }
-      batchStatus(jumlah + ' soal ditambahkan. Total di bank: ' + state.bank.length + '.');
+      var pesan = jumlah + ' soal ditambahkan. Total di bank: ' + state.bank.length + '.';
+      if (dialihkan) {
+        pesan += ' ' + dialihkan + ' di antaranya memakai bangun polos, jadi tipenya ' +
+          'dialihkan ke bangun ruang \u2192 jaring-jaring.';
+      }
+      batchStatus(pesan);
     } catch (e) {
       batchStatus('Gagal membuat soal: ' + e.message, true);
     } finally {

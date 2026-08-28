@@ -150,6 +150,27 @@ Jaminannya bersifat pasti tanpa perlu mencoba melipat: hasil lipatan sebuah
 jaring-jaring selalu punya kumpulan sisi yang sama persis dengan jaring itu, jadi
 jaring milik bangun dengan kumpulan sisi berbeda mustahil membentuk bangun pada soal.
 
+### Tipe soal tidak boleh berubah sendiri di tengah paket
+
+Bangun tak beraturan dipakai **polos**, jadi tipe A (jaring-jaring → bangun ruang)
+tidak punya bahan pengecoh sama sekali untuknya. Dulu pengalihan tipenya ditulis
+langsung ke elemen `<select>` dan menempel permanen: satu bentuk tak beraturan di
+nomor 7 membuat 93 soal sisanya ikut berbalik arah menjadi bangun ruang →
+jaring-jaring. Sekarang:
+
+- tipe ditetapkan **ulang untuk tiap nomor**, tidak diwarisi dari nomor sebelumnya;
+- pada tipe A, bentuk polos **tidak ikut diundi** sama sekali;
+- kalau pengalihan tetap terjadi (variasi "Acak bentuk" memang selalu memakai bentuk
+  polos), jumlahnya **dilaporkan di baris status**, tidak diam-diam;
+- tipe tiap soal ikut tertulis di daftar bank soal, sehingga penyimpangan langsung terlihat.
+
+Bangun polos juga tidak lagi mewarisi corak bangun sebelumnya: berpindah dari kubus
+bercorak ke bangun tak beraturan bersisi enam dulu membawa serta mata dadunya.
+
+Diperiksa dari 16 kombinasi variasi × tipe (masing-masing 9 soal) dan sekali paket
+100 soal penuh: 100/100 halaman judul PDF menyebut tipe yang benar, 100/100 halaman
+pembahasan memakai arah kalimat yang sesuai.
+
 ## Alur pemakaian
 
 1. **Pilih bangun ruang.** Untuk balok, panjang/lebar/tinggi bisa diubah; jaring-jaring

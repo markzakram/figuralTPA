@@ -482,8 +482,10 @@
 
   function generateNetChoice(solid, faces, nets, opts) {
     opts = opts || {};
-    // bangun polos: bedanya hanya bentuk, jadi pengecoh diambil dari bangun lain
-    var polos = !faces || faces.every(function (f) { return Art.isBlank(f.art); });
+    // Bangun polos: bedanya hanya bentuk, jadi pengecoh diambil dari bangun lain.
+    // Penandanya diambil dari bangunnya sendiri lebih dulu — menyimpulkannya dari
+    // corak saja membuat satu sisi tersisa bisa membelokkan seluruh jenis soal.
+    var polos = !!solid.polos || !faces || faces.every(function (f) { return Art.isBlank(f.art); });
     if (polos && opts.pool && opts.pool.length) {
       return netChoicePolos(solid, nets, opts.pool, opts);
     }
