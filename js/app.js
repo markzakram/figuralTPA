@@ -897,10 +897,11 @@
   }
 
   /**
-   * Unduh seluruh bank soal sebagai berkas Word: 2 halaman per soal (halaman
-   * soal dan halaman pembahasan). Gambarnya disematkan sebagai PNG, bukan
-   * piksel mentah seperti pada PDF, karena itulah format gambar yang dipahami
-   * Word.
+   * Unduh seluruh bank soal sebagai berkas Word. Susunannya mengikuti PDF —
+   * empat halaman per soal pada halaman 16:9 — dan judulnya memakai gaya
+   * Heading 1/2/3 sehingga Google Docs menampilkan kerangka dokumennya.
+   * Gambarnya disematkan sebagai PNG, bukan piksel mentah seperti pada PDF,
+   * karena itulah format gambar yang dipahami Word.
    */
   async function downloadDOCX() {
     if (!state.bank.length) { batchStatus('Bank soal masih kosong — tekan Generate dulu.', true); return; }
@@ -929,7 +930,7 @@
       batchStatus('Memampatkan berkas Word…');
       var blob = await Docx.buat(soal, {});
       Raster.unduhBlob(blob, 'soal-bangun-ruang-' + state.bank.length + 'soal.docx');
-      batchStatus('Word siap: ' + (state.bank.length * 2) + ' halaman dari ' + state.bank.length +
+      batchStatus('Word siap: ' + (state.bank.length * 4) + ' halaman dari ' + state.bank.length +
         ' soal (' + (blob.size / 1048576).toFixed(1) + ' MB).');
     } catch (e) {
       batchStatus('Ekspor Word gagal: ' + e.message, true);

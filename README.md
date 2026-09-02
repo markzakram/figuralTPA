@@ -245,10 +245,8 @@ Mengikuti format PDF generator *diagrammatical*: halaman **1440 × 810 pt**
 1. **Judul** — nomor soal, tipe soal, dan tingkat kesulitan (berwarna).
 2. **Gambar soal** — jaring-jaring atau bangun ruang, tergantung tipe.
 3. **Pilihan A–E**.
-4. **Kunci & pembahasan** — gambar bernomor di kiri, uraian di kanan. (Pada berkas
-   Word gambarnya berada di atas uraian, karena itu kalimat rujukannya menyebut
-   "gambar pembahasan" tanpa kata penunjuk arah — kalimat yang menyebut posisi
-   pasti keliru di salah satu format.)
+4. **Kunci & pembahasan** — gambar bernomor di kiri, uraian di kanan. Berkas Word
+   memakai susunan yang sama.
 
 ### Pembahasan bernomor
 
@@ -280,31 +278,57 @@ jawaban di halaman terakhir).
 
 ## Format Word (.docx)
 
-Tombol **Unduh Word** menghasilkan berkas yang bisa langsung disunting: soalnya
-dapat diubah kalimatnya, gambarnya dipindahkan, atau nomornya disusun ulang.
-Halaman **A4 melintang** dengan tepi 2 cm, dan **dua halaman per soal**:
+Tombol **Unduh Word** menghasilkan berkas yang bisa langsung disunting: kalimatnya
+diubah, gambarnya dipindahkan, atau nomornya disusun ulang. Susunannya **mengikuti
+PDF** — halaman **1440 × 810 pt** (28800 × 16200 twip, 16:9) dan **empat halaman per
+soal** — sehingga berkas Word dan PDF dari bank soal yang sama terbaca serupa.
+Halaman pembahasannya memakai tabel dua kolom tanpa garis: gambar bernomor di kiri,
+uraian di kanan, sama seperti PDF.
 
-1. **Halaman soal** — nomor, tipe, tingkat kesulitan, gambar soal, dan pilihan A–E.
-2. **Halaman pembahasan** — kunci, gambar bernomor, dan uraian tiap pengecoh.
+### Kerangka dokumen
 
-PDF memakai empat halaman karena formatnya layar 16:9; untuk berkas yang akan
-disunting, dua halaman A4 lebih ringkas tanpa kehilangan isi.
+Judulnya memakai **gaya judul sungguhan**, bukan sekadar teks tebal, sehingga Google
+Docs dan Word menampilkan daftar isi/kerangka dokumen di panel samping:
 
-**Penyusunnya ditulis sendiri, tanpa pustaka luar.** Sebuah `.docx` adalah arsip ZIP
-berisi XML, jadi `js/docx.js` bekerja dua lapis: penulis ZIP di bawah (header lokal,
-direktori pusat, EOCD, CRC-32, deflate mentah lewat `CompressionStream`) dan penyusun
-WordprocessingML di atasnya. Gambar disematkan sebagai **PNG** — format gambar yang
-dipahami Word — dan ukuran tampilnya ditetapkan dalam EMU agar muat pada halaman
-tanpa bergantung pada dugaan dpi.
+| Teks | Gaya | Tingkat kerangka |
+|---|---|---|
+| `No. 1` | Heading 1 | 0 |
+| `Jawaban: B` | Heading 2 | 1 |
+| `Pembahasan:` | Heading 3 | 2 |
+
+Yang membuatnya dikenali bukan ukuran hurufnya, melainkan `word/styles.xml` yang
+mendefinisikan gaya dengan nama baku (`heading 1`, …) dan `w:outlineLvl`. Ukuran
+hurufnya disamakan dengan PDF: 45 pt, 30 pt, dan 22 pt.
+
+### Penyusunnya ditulis sendiri, tanpa pustaka luar
+
+Sebuah `.docx` adalah arsip ZIP berisi XML, jadi `js/docx.js` bekerja dua lapis:
+penulis ZIP di bawah (header lokal, direktori pusat, EOCD, CRC-32, deflate mentah
+lewat `CompressionStream`) dan penyusun WordprocessingML di atasnya. Gambar
+disematkan sebagai **PNG** — format gambar yang dipahami Word — dan ukuran tampilnya
+ditetapkan dalam EMU agar muat pada halaman tanpa bergantung pada dugaan dpi.
 
 Berbeda dari PDF yang teksnya harus Latin-1, Word menyimpan teks sebagai **UTF-8**
 sehingga tanda panah pada "Jaring-jaring → bangun ruang" tetap tertulis sebagaimana
 adanya, bukan diganti "->".
 
-Diuji dengan membuka hasilnya di **Microsoft Word 16.0**: berkas terbuka tanpa dialog
-perbaikan, 8 soal menjadi 16 halaman dengan 24 gambar, orientasi melintang, dan
-seluruh teks terbaca utuh. Keabsahan arsipnya juga diperiksa terpisah oleh pembaca
-ZIP .NET, bukan oleh penulis ZIP yang sama.
+### Yang diperiksa
+
+Diuji dengan membuka hasilnya di **Microsoft Word 16.0**:
+
+| Yang diperiksa | Hasil |
+|---|---|
+| Word membuka berkas | tanpa dialog perbaikan |
+| halaman | 24 dari 6 soal (empat per soal) |
+| gambar tersemat | 18 (tiga per soal), 6 tabel pembahasan |
+| ukuran halaman | 1440 × 810 pt, sama persis dengan PDF |
+| gambar keluar area cetak | 0 dari 18 |
+| kerangka dokumen | `No. N` → `Jawaban: X` → `Pembahasan:` bertingkat 1-2-3 |
+| tata letak pembahasan | gambar berakhir di 664 px, kolom teks mulai 687 px — benar-benar bersebelahan |
+| teks UTF-8 | panah "→" utuh |
+
+Keabsahan arsipnya juga diperiksa terpisah oleh pembaca ZIP .NET, bukan oleh penulis
+ZIP yang sama.
 
 ## Cara kerja & jaminan kebenaran
 
