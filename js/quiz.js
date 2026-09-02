@@ -574,6 +574,14 @@
       sudah[k] = true;
       return true;
     });
+    // Jaring pada soal memperlihatkan apakah bangunnya menirus (pitanya membuka
+    // seperti kipas) atau tegak (pitanya lurus). Pengecoh dari kelas yang lain
+    // langsung tercoret tanpa perlu membayangkan lipatannya, jadi hanya bangun
+    // sekelas yang dipakai selama jumlahnya cukup.
+    var lengkungKunci = S.jaringMelengkung(target);
+    var sekelas = kandidat.filter(function (k) { return S.jaringMelengkung(k) === lengkungKunci; });
+    if (sekelas.length >= count - 1) kandidat = sekelas;
+
     // pengecoh diambil dari bentuk yang paling menyerupai kunci
     var pool = shuffle(S.urutMirip(target, kandidat).slice(0, Math.max(count * 2, 8)), rnd);
 

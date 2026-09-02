@@ -408,65 +408,227 @@
   }
 
   /**
-   * Limas terpancung: dua poligon sejajar berbeda ukuran, dihubungkan trapesium.
-   * Susunan sisinya sama dengan prisma (dua tutup + segelang sisi segiempat),
-   * jadi jaring pitanya pun terbentuk otomatis.
+   * Penampang dari kisi SEGITIGA (poliamond): 3-6 segitiga sama sisi yang
+   * menempel. Sudutnya 60/120 derajat, jadi bentuknya — trapesium, jajar
+   * genjang, segienam, anak panah — jelas berbeda dari poliomino bersudut siku,
+   * sementara prismanya tetap prisma tegak dengan jaring pita yang lurus.
+   *
+   * Titik kisi P(i,j) = (i + j/2, j*akar3/2). Segitiga "atas" pada (i,j)
+   * bertitik P(i,j), P(i+1,j), P(i,j+1); segitiga "bawah" bertitik
+   * P(i+1,j), P(i+1,j+1), P(i,j+1).
    */
-  function frustumSolid(n, rBawah, rAtas, tinggi) {
-    var bawah = ring(n, rBawah, -tinggi / 2), atas = ring(n, rAtas, tinggi / 2);
-    var verts = bawah.concat(atas);
-    var faces = [
-      { v: bawah.map(function (_, i) { return i; }), name: 'Alas' },
-      { v: atas.map(function (_, i) { return n + i; }), name: 'Tutup' }
+  function poliamond(rnd, jumlah) {
+    var H = Math.sqrt(3) / 2;
+    function P(i, j) { return [i + j / 2, j * H]; }
+    function titik(c) {
+      return c[2] ? [P(c[0], c[1]), P(c[0] + 1, c[1]), P(c[0], c[1] + 1)]
+                  : [P(c[0] + 1, c[1]), P(c[0] + 1, c[1] + 1), P(c[0], c[1] + 1)];
+    }
+    function tetangga(c) {
+      var i = c[0], j = c[1];
+      return c[2] ? [[i, j, 0], [i - 1, j, 0], [i, j - 1, 0]]
+                  : [[i, j, 1], [i + 1, j, 1], [i, j + 1, 1]];
+    }
+    var kunci = function (c) { return c.join(','); };
+    var ada = {}, daftar = [[0, 0, 1]];
+    ada[kunci(daftar[0])] = true;
+    var aman = 0;
+    while (daftar.length < jumlah && aman++ < 400) {
+      var dasar = daftar[Math.floor(rnd() * daftar.length)];
+      var pilihan = tetangga(dasar);
+      var c = pilihan[Math.floor(rnd() * pilihan.length)];
+      if (ada[kunci(c)]) continue;
+      ada[kunci(c)] = true;
+      daftar.push(c);
+    }
+
+    // tepi luar: rusuk dalam muncul dua kali berlawanan arah dan saling meniadakan
+    var rusuk = {}, kt = function (p) { return Math.round(p[0] * 1000) + ',' + Math.round(p[1] * 1000); };
+    daftar.forEach(function (c) {
+      var t = titik(c);
+      for (var k = 0; k < 3; k++) {
+        var a = t[k], b = t[(k + 1) % 3];
+        var maju = kt(a) + '>' + kt(b), mundur = kt(b) + '>' + kt(a);
+        if (rusuk[mundur]) delete rusuk[mundur];
+        else rusuk[maju] = [a, b];
+      }
+    });
+    var kunciRusuk = Object.keys(rusuk);
+    if (!kunciRusuk.length) return null;
+    var dari = {}, jepit = false;
+    kunciRusuk.forEach(function (k) {
+      var r = rusuk[k], a = kt(r[0]);
+      if (dari[a]) jepit = true;
+      dari[a] = r;
+    });
+    if (jepit) return null;
+    var mulai = rusuk[kunciRusuk[0]][0], keliling = [mulai], kini = mulai;
+    for (aman = 0; aman < 200; aman++) {
+      var r = dari[kt(kini)];
+      if (!r) return null;
+      kini = r[1];
+      if (kt(kini) === kt(mulai)) break;
+      keliling.push(kini);
+    }
+    if (keliling.length !== kunciRusuk.length) return null;
+    return keliling;
+  }
+
+  /**
+   * Templat penampang klasik dengan sedikit getaran acak: rumah, anak panah,
+   * layang-layang, perahu, segidelapan, dan tanda panah. Bentuk-bentuk ini
+   * dikenali sekilas oleh siapa pun, jadi bangunnya mudah dibayangkan meski
+   * tidak "beraturan" dalam arti matematis.
+   */
+  function templatePenampang(rnd) {
+    var g = function (k) { return 1 + (rnd() - 0.5) * 2 * k; };   // getaran ±k
+    var daftar = [
+      // rumah: kotak dengan atap segitiga
+      function () { var a = 1.15 * g(0.15), t = 0.8 * g(0.2); return [[0, 0], [2, 0], [2, a], [1, a + t], [0, a]]; },
+      // anak panah: gagang + kepala
+      function () { var w = 0.7 * g(0.15), k = 1.1 * g(0.1); return [[0, 1 - w / 2], [k, 1 - w / 2], [k, 0], [2.1, 1], [k, 2], [k, 1 + w / 2], [0, 1 + w / 2]]; },
+      // layang-layang
+      function () { var s = 0.85 * g(0.15); return [[1, 0], [2, s], [1, 2.3], [0, s]]; },
+      // perahu: trapesium dengan alas lebih pendek
+      function () { var m = 0.45 * g(0.3); return [[m, 0], [2 - m, 0], [2.2, 1.1 * g(0.1)], [-0.2, 1.1 * g(0.1)]]; },
+      // segidelapan: persegi panjang yang keempat sudutnya dipangkas
+      function () { var c = 0.5 * g(0.2), L = 2.2 * g(0.1), T = 1.7 * g(0.1); return [[c, 0], [L - c, 0], [L, c], [L, T - c], [L - c, T], [c, T], [0, T - c], [0, c]]; },
+      // tanda panah (chevron)
+      function () { var d = 0.7 * g(0.2), t = 1.1 * g(0.1); return [[0, 0], [1, d], [2, 0], [2, t], [1, t + d], [0, t]]; },
+      // trapesium sama kaki yang tinggi
+      function () { var m = 0.5 * g(0.3); return [[m, 0], [2 - m, 0], [2, 1.4 * g(0.1)], [0, 1.4 * g(0.1)]]; }
     ];
-    for (var i = 0; i < n; i++) {
+    var pts = daftar[Math.floor(rnd() * daftar.length)]();
+    // pencerminan acak supaya arah bentuknya tidak selalu sama
+    if (rnd() < 0.5) pts = pts.map(function (p) { return [-p[0], p[1]]; }).reverse();
+    return poligonSederhana(pts) ? pts : null;
+  }
+
+  /** Normalkan poligon 2D: lebar terbesarnya 1, berpusat di titik asal. */
+  function normalkan(pts) {
+    var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+    var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var k = 1 / Math.max(x1 - x0, y1 - y0);
+    return pts.map(function (p) { return [(p[0] - (x0 + x1) / 2) * k, (p[1] - (y0 + y1) / 2) * k]; });
+  }
+
+  /**
+   * Susun bangun berbentuk prisma umum dari dua gelang titik 3D yang sama
+   * banyaknya: alas, tutup, dan segelang sisi segiempat. Dipakai oleh ekstrusi
+   * (tutup = salinan alas), limas terpancung (tutup diperkecil), dan prisma
+   * beratap miring (tutup pada bidang condong).
+   */
+  function susunPrisma(bawah, atas) {
+    var n = bawah.length, verts = bawah.concat(atas), faces = [], i;
+    faces.push({ v: bawah.map(function (_, j) { return j; }), name: 'Alas' });
+    faces.push({ v: atas.map(function (_, j) { return n + j; }), name: 'Tutup' });
+    for (i = 0; i < n; i++) {
       var j = (i + 1) % n;
       faces.push({ v: [i, j, n + j, n + i], name: 'Sisi ' + (i + 1) });
     }
     return { verts: verts, faces: faces };
   }
 
+  /** Ekstrusi poligon datar menjadi prisma tegak, dinormalkan ke lebar 1. */
+  function ekstrusi(pts, tebal) {
+    var datar = normalkan(pts);
+    return susunPrisma(
+      datar.map(function (p) { return [p[0], -tebal / 2, p[1]]; }),
+      datar.map(function (p) { return [p[0], tebal / 2, p[1]]; })
+    );
+  }
+
   /**
-   * Bangun tak beraturan: penampang poliomino acak (profil L, T, U, S, tangga,
-   * balok bertakik) yang diekstrusi, kadang dengan satu sudut dipangkas miring.
-   * Sisi datarnya tetap poligon sederhana sehingga seluruh mesin — orientasi,
-   * simetri, pembukaan, penggambaran — tetap berlaku.
+   * Limas terpancung: alas dan tutup sebangun tetapi berbeda ukuran. Rusuk
+   * tegaknya mengumpul ke satu titik, sehingga jaring pitanya membuka seperti
+   * kipas — inilah satu-satunya keluarga yang jaringnya melengkung.
    */
-  function irregularSolid(benih, opsi) {
-    opsi = opsi || {};
-    var rnd = mulberry32((benih | 0) || 1);
+  function frustumSolid(n, rBawah, rAtas, tinggi) {
+    return susunPrisma(ring(n, rBawah, -tinggi / 2), ring(n, rAtas, tinggi / 2));
+  }
 
-    // Empat keluarga bentuk. Satu keluarga saja (poliomino bersudut siku)
-    // membuat seluruh bentuk terasa sekeluarga; keempatnya bersama memberi
-    // ragam yang jauh lebih lebar tanpa mengorbankan keterbacaan.
-    var jenis = rnd();
-    // Prisma miring sudah tidak dipakai. Kemiringan membuat setiap sisi tegak
-    // menjadi jajar genjang dengan sudut yang berbeda-beda, sehingga pita
-    // jaringnya menyerong 9-28 derajat: di kertas terbaca sebagai jaring
-    // melengkung padahal bangunnya bersudut siku. Ragam siluet tidak sepadan
-    // dengan hilangnya keterbacaan itu.
-    var geser = null;
+  /** Limas terpancung dengan alas sembarang (cembung), tutup diperkecil k kali. */
+  function terpancungDariPenampang(pts, k, tinggi) {
+    var datar = normalkan(pts);
+    return susunPrisma(
+      datar.map(function (p) { return [p[0], -tinggi / 2, p[1]]; }),
+      datar.map(function (p) { return [p[0] * k, tinggi / 2, p[1] * k]; })
+    );
+  }
 
-    // Bobot keluarga: poliomino ~46%, penampang cembung ~36%, limas terpancung ~18%.
-    // Poliomino sengaja tidak lagi mayoritas mutlak — sebelumnya 62% dan seluruh
-    // bentuk jadi terasa sekeluarga (blok siku L/V) meski jumlahnya ratusan.
-    if (jenis > 0.82) {
-      // Alas minimal 4 sisi dan ketirusan ditahan (tutup 55-80% alas). Ketirusan
-      // yang tajam membuat bidang tegaknya membuka menjadi kipas yang melingkar
-      // hampir penuh — jaringnya sah tetapi terlihat kusut dan sulit dibayangkan.
-      var sisiF = 4 + Math.floor(rnd() * 3);            // 4..6 sisi alas
-      var rBawah = 0.6 + rnd() * 0.12;
-      return frustumSolid(sisiF, rBawah, rBawah * (0.68 + rnd() * 0.2), 0.55 + rnd() * 0.35);
+  /**
+   * Prisma BERATAP MIRING: alas datar, tutupnya bidang yang condong, sehingga
+   * sisi tegaknya trapesium dengan tinggi berbeda-beda — seperti balok yang
+   * dipotong serong atau rumah beratap satu sisi. Rusuk tegaknya tetap sejajar,
+   * jadi jaring pitanya tetap LURUS meski tutupnya berbeda luas dari alas.
+   */
+  function atapMiring(pts, tebal, rnd) {
+    var datar = normalkan(pts);
+    tebal = Math.max(tebal, 0.55);
+    // condong terutama ke satu arah supaya "atapnya" terbaca sebagai satu bidang
+    var a = (0.16 + rnd() * 0.2) * (rnd() < 0.5 ? -1 : 1);
+    var b = (rnd() - 0.5) * 0.12;
+    if (rnd() < 0.5) { var tmp = a; a = b; b = tmp; }
+    var atas = datar.map(function (p) { return [p[0], tebal / 2 + a * p[0] + b * p[1], p[1]]; });
+    // tinggi terendah tidak boleh kurang dari 55% tebal, tertinggi tidak melebihi 1
+    var yMin = Infinity, yMaks = -Infinity;
+    atas.forEach(function (v) { yMin = Math.min(yMin, v[1]); yMaks = Math.max(yMaks, v[1]); });
+    if (yMin + tebal / 2 < tebal * 0.55 || yMaks + tebal / 2 > 1.0) return null;
+    return susunPrisma(datar.map(function (p) { return [p[0], -tebal / 2, p[1]]; }), atas);
+  }
+
+  /**
+   * Ukuran keterbacaan sebuah bangun mentah, dipakai untuk menyaring hasil acak:
+   *   luasR   — luas sisi terkecil : terbesar (sisi setipis bilah tidak terbaca)
+   *   dihMin  — sudut dihedral terkecil antar sisi bertetangga (tepi setajam pisau)
+   *   rusukR  — rusuk terpendek : terpanjang
+   */
+  function ukurKeterbacaan(raw) {
+    var urut = orientasiSeragam(raw.verts, raw.faces);
+    var sisi = urut.map(function (idx) {
+      var vs = idx.map(function (k) { return raw.verts[k]; });
+      var n = polyNormal(vs);
+      return { v: idx, normal: n, area: polyArea(vs, n), vs: vs };
+    });
+    var luasMin = Infinity, luasMaks = 0, rMin = Infinity, rMaks = 0, i, j;
+    sisi.forEach(function (f) {
+      luasMin = Math.min(luasMin, f.area); luasMaks = Math.max(luasMaks, f.area);
+      for (i = 0; i < f.vs.length; i++) {
+        var L = length(sub(f.vs[(i + 1) % f.vs.length], f.vs[i]));
+        rMin = Math.min(rMin, L); rMaks = Math.max(rMaks, L);
+      }
+    });
+    var dihMin = 180;
+    for (i = 0; i < sisi.length; i++) {
+      for (j = i + 1; j < sisi.length; j++) {
+        var bersama = sisi[i].v.filter(function (k) { return sisi[j].v.indexOf(k) >= 0; }).length;
+        if (bersama < 2) continue;
+        var c = Math.max(-1, Math.min(1, dot(sisi[i].normal, sisi[j].normal)));
+        dihMin = Math.min(dihMin, 180 - Math.acos(c) * DEG);
+      }
     }
-    if (jenis > 0.46) {
-      var cembung = penampangCembung(rnd);
-      if (cembung) return ekstrusi(cembung, 0.40 + Math.floor(rnd() * 7) * 0.105, geser);
-    }
+    return { luasR: luasMaks > EPS ? luasMin / luasMaks : 0, dihMin: dihMin, rusukR: rMaks > EPS ? rMin / rMaks : 0 };
+  }
 
-    var pts = null;
+  /** Batas keterbacaan: di bawah ini bentuknya dibuang dan diacak ulang. */
+  function terbaca(raw) {
+    if (!raw) return false;
+    var u = ukurKeterbacaan(raw);
+    if (u.luasR < 0.15 || u.dihMin < 50 || u.rusukR < 0.22) return false;
+    // bangun gepeng (tebal kurang dari 36% lebarnya) terbaca sebagai lempengan
+    var lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    raw.verts.forEach(function (v) {
+      for (var k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], v[k]); hi[k] = Math.max(hi[k], v[k]); }
+    });
+    var ukuran = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]].sort(function (a, b) { return a - b; });
+    return ukuran[0] / ukuran[2] >= 0.36;
+  }
+
+  /** Penampang poliomino acak yang memenuhi batasan keterbacaan, atau null. */
+  function penampangPoliomino(rnd) {
     var petak = 3 + Math.floor(rnd() * 5);              // 3..7 petak
-
-    for (var coba = 0; coba < 120 && !pts; coba++) {
+    for (var coba = 0; coba < 120; coba++) {
       var petakAcak = poliomino(rnd, petak);
       // Kotak pembatas dibatasi 4 petak, dan bentuk selebar 1 petak ditolak.
       // Penampang yang menjulur panjang menghasilkan petak yang sangat kecil
@@ -488,51 +650,93 @@
       // masuk dalam batas ini.
       if (p.length < 6 || p.length > 8) continue;
       if (!poligonSederhana(p)) continue;
-      // sebagian dipangkas satu petak agar ada bidang miring, seperti balok bertakik
-      if (rnd() < 0.35) {
+      // sebagian dipangkas satu petak (kadang dua) agar ada bidang miring
+      if (rnd() < 0.4) {
         var dipangkas = pangkasSatuPetak(p, rnd);
-        if (poligonSederhana(dipangkas)) p = dipangkas;
+        if (rnd() < 0.35) dipangkas = pangkasSatuPetak(dipangkas, rnd);
+        if (poligonSederhana(dipangkas) && dipangkas.length <= 9) p = dipangkas;
       }
-      pts = p;
+      return p;
     }
-    if (!pts) pts = [[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]];   // profil L cadangan
+    return null;
+  }
 
-    // Tebal dijaga sebanding dengan penampang (yang dinormalkan ke 1). Kalau
-    // terlalu tipis, pita jaring memanjang seperti penggaris dan kedua tutupnya
-    // tampak kecil sehingga bentuknya sulit dibayangkan.
-    // Tebal ditahan di bawah lebar penampang. Sebelumnya bisa mencapai 1,3 kali
-    // penampang sehingga bangunnya menjulang seperti tiang; bentuk rujukan justru
-    // lebih rebah — lebarnya melebihi tingginya.
-    return ekstrusi(pts, opsi.tebal || (0.40 + Math.floor(rnd() * 6) * 0.115), geser);
+  /** Penampang poliamond acak yang lolos batasan bentuk, atau null. */
+  function penampangPoliamond(rnd) {
+    for (var coba = 0; coba < 60; coba++) {
+      var jumlah = 3 + Math.floor(rnd() * 4);            // 3..6 segitiga
+      var ring2 = poliamond(rnd, jumlah);
+      if (!ring2) continue;
+      var p = gabungSegaris(ring2);
+      // segitiga polos (3 rusuk) sudah diwakili prisma segitiga baku
+      if (p.length < 4 || p.length > 8 || !poligonSederhana(p)) continue;
+      var xs = p.map(function (q) { return q[0]; }), ys = p.map(function (q) { return q[1]; });
+      var lb = Math.max.apply(null, xs) - Math.min.apply(null, xs);
+      var tg = Math.max.apply(null, ys) - Math.min.apply(null, ys);
+      if (Math.min(lb, tg) / Math.max(lb, tg) < 0.5) continue;
+      return p;
+    }
+    return null;
   }
 
   /**
-   * Ekstrusi poligon datar menjadi prisma, dinormalkan ke lebar 1.
-   * `geser` menggeser tutup atas ke samping sehingga terbentuk prisma MIRING —
-   * sisi tegaknya menjadi jajar genjang dan siluetnya jelas berbeda dari prisma
-   * tegak, padahal jaring-jaringnya tetap berupa pita yang mudah dibaca.
+   * Bangun tak beraturan, dibangkitkan dari tujuh keluarga dan disaring dengan
+   * batasan keterbacaan yang sama (sisi terkecil, sudut dihedral, rusuk
+   * terpendek). Semua keluarga kecuali limas terpancung adalah prisma dengan
+   * rusuk tegak sejajar, sehingga jaring pitanya membuka LURUS.
    */
-  function ekstrusi(pts, tebal, geser) {
-    var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
-    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
-    var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-    var k = 1 / Math.max(x1 - x0, y1 - y0);
-    var datar = pts.map(function (p) {
-      return [(p[0] - (x0 + x1) / 2) * k, (p[1] - (y0 + y1) / 2) * k];
-    });
+  function irregularSolid(benih, opsi) {
+    opsi = opsi || {};
+    var rnd = mulberry32((benih | 0) || 1);
+    var tebalPoli = function () { return opsi.tebal || (0.40 + Math.floor(rnd() * 6) * 0.115); };
+    var tebalCembung = function () { return opsi.tebal || (0.40 + Math.floor(rnd() * 7) * 0.105); };
+    var tebalLebar = function () { return opsi.tebal || (0.50 + Math.floor(rnd() * 6) * 0.09); };
 
-    var gx = geser ? geser[0] : 0, gz = geser ? geser[1] : 0;
-    var n = datar.length, verts = [], faces = [], i;
-    for (i = 0; i < n; i++) verts.push([datar[i][0], -tebal / 2, datar[i][1]]);
-    for (i = 0; i < n; i++) verts.push([datar[i][0] + gx, tebal / 2, datar[i][1] + gz]);
-
-    faces.push({ v: datar.map(function (_, j) { return j; }), name: 'Alas' });
-    faces.push({ v: datar.map(function (_, j) { return n + j; }), name: 'Tutup' });
-    for (i = 0; i < n; i++) {
-      var j2 = (i + 1) % n;
-      faces.push({ v: [i, j2, n + j2, n + i], name: 'Sisi ' + (i + 1) });
+    // penampang untuk keluarga prisma; sumbernya diundi ulang tiap percobaan
+    function penampangCampur() {
+      var u = rnd();
+      if (u < 0.45) return penampangPoliomino(rnd);
+      if (u < 0.75) return templatePenampang(rnd);
+      return penampangCembung(rnd);
     }
-    return { verts: verts, faces: faces };
+
+    // Bobot keluarga. Poliomino tidak lagi mayoritas: dulu 46-62% dan seluruh
+    // bentuk terasa sekeluarga (blok siku L/V) meski jumlahnya ratusan.
+    var jenis = rnd();
+    var hasil = null;
+    for (var coba = 0; coba < 8 && !terbaca(hasil); coba++) {
+      var pts;
+      if (jenis < 0.26) {                                          // poliomino
+        pts = penampangPoliomino(rnd);
+        hasil = pts ? ekstrusi(pts, tebalPoli()) : null;
+      } else if (jenis < 0.40) {                                   // kisi segitiga
+        pts = penampangPoliamond(rnd);
+        hasil = pts ? ekstrusi(pts, tebalLebar()) : null;
+      } else if (jenis < 0.54) {                                   // templat klasik
+        pts = templatePenampang(rnd);
+        hasil = pts ? ekstrusi(pts, tebalLebar()) : null;
+      } else if (jenis < 0.68) {                                   // cembung acak
+        pts = penampangCembung(rnd);
+        hasil = pts ? ekstrusi(pts, tebalCembung()) : null;
+      } else if (jenis < 0.84) {                                   // beratap miring
+        pts = penampangCampur();
+        hasil = pts ? atapMiring(pts, tebalCembung(), rnd) : null;
+      } else if (jenis < 0.93) {                                   // terpancung beraturan
+        // Ketirusan ditahan (tutup 68-88% alas): ketirusan tajam membuka menjadi
+        // kipas yang melingkar hampir penuh — sah, tetapi kusut dan sulit dibayangkan.
+        var sisiF = 4 + Math.floor(rnd() * 3);
+        var rBawah = 0.6 + rnd() * 0.12;
+        hasil = frustumSolid(sisiF, rBawah, rBawah * (0.68 + rnd() * 0.2), 0.55 + rnd() * 0.35);
+      } else {                                                     // terpancung alas cembung
+        pts = penampangCembung(rnd);
+        hasil = pts ? terpancungDariPenampang(pts, 0.68 + rnd() * 0.2, 0.55 + rnd() * 0.35) : null;
+      }
+    }
+    if (!terbaca(hasil)) {
+      // profil L cadangan — selalu terbaca
+      hasil = ekstrusi([[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [0, 2]], opsi.tebal || 0.6);
+    }
+    return hasil;
   }
 
   var CATALOG = {
@@ -1594,20 +1798,34 @@
   }
 
   /**
-   * Apakah jaring-jaring bangun ini melengkung? Pita sisi tegak sebuah prisma
-   * tegak MAUPUN prisma miring membuka lurus karena semua rusuk lipatnya
-   * sejajar; yang membuka melengkung seperti kipas hanyalah limas terpancung,
-   * sebab kedua tutupnya berbeda ukuran. Nilainya 0 untuk jaring lurus dan
-   * makin besar makin melengkung.
+   * Seberapa melengkung pita jaring bangun ini. Pita sisi tegak membuka LURUS
+   * bila semua rusuk lipatnya — rusuk yang dimiliki dua sisi tegak bertetangga —
+   * sejajar di ruang. Itu berlaku untuk prisma tegak maupun prisma beratap
+   * miring: tutup yang berbeda luas tidak mengubah arah rusuk tegaknya. Yang
+   * membuka melengkung seperti kipas hanya bangun yang rusuk tegaknya mengumpul
+   * ke satu titik, yakni limas terpancung. Nilainya 0 untuk lurus, 1 bila rusuk
+   * tegaknya menyebar 90 derajat. (Ukuran lama — selisih luas tutup — keliru
+   * menggolongkan prisma beratap miring sebagai melengkung.)
    */
   function ketirusan(solid) {
     if (solid._ketirusan !== undefined) return solid._ketirusan;
     var nilai = 0;
     var p = strukturPrisma(solid);
     if (p) {
-      var a2 = solid.faces[p.tutup[0]].area, b2 = solid.faces[p.tutup[1]].area;
-      var besar = Math.max(a2, b2), kecil = Math.min(a2, b2);
-      if (besar > EPS) nilai = 1 - Math.sqrt(kecil / besar);
+      var arah = [], i, j;
+      for (i = 0; i < p.gelang.length; i++) {
+        var a = solid.faces[p.gelang[i]], b = solid.faces[p.gelang[(i + 1) % p.gelang.length]];
+        var bersama = a.v.filter(function (k) { return b.v.indexOf(k) >= 0; });
+        if (bersama.length === 2) arah.push(unit(sub(solid.verts[bersama[1]], solid.verts[bersama[0]])));
+      }
+      var maks = 0;
+      for (i = 0; i < arah.length; i++) {
+        for (j = i + 1; j < arah.length; j++) {
+          var c = Math.min(1, Math.abs(dot(arah[i], arah[j])));
+          maks = Math.max(maks, Math.acos(c));
+        }
+      }
+      nilai = maks / (Math.PI / 2);
     }
     try { solid._ketirusan = nilai; } catch (e) { /* objek beku */ }
     return nilai;
@@ -1682,6 +1900,8 @@
     symmetries: symmetries, isSpanningTree: isSpanningTree, treeKey: treeKey,
     polyOverlap: polyOverlap, unfold: unfold, netLurus: netLurus,
     irregularSolid: irregularSolid, mulberry32: mulberry32, strukturPrisma: strukturPrisma,
+    poliamond: poliamond, templatePenampang: templatePenampang, ukurKeterbacaan: ukurKeterbacaan,
+    frustumSolid: frustumSolid, atapMiring: atapMiring, ekstrusi: ekstrusi,
     poligonSederhana: poligonSederhana, signedVolume: signedVolume,
     anglesToMatrix: anglesToMatrix, choosePose: choosePose, orthonormalize: orthonormalize,
     matVec: matVec, matMul: matMul, det: det, dot: dot, cross: cross, unit: unit,

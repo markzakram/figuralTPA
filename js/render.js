@@ -137,13 +137,14 @@
     var nomor = '';
     if (opts.nomor) {
       var rr = opts.ukuranNomor || 11;
-      var titik = [];
+      var titik = [], rintangan = segi.slice();
       tampak.forEach(function (item, k) {
         var no = opts.nomor[item.f.index];
         if (!no) return;
-        var t = titikNomor(segi[k], segi, rr);
+        var t = titikNomor(segi[k], rintangan, rr);
         t.no = no;
         titik.push(t);
+        rintangan.push(cakramNomor(t, rr));   // nomor berikutnya menghindari yang ini
       });
       nomor = gambarNomor(renggangkan(titik, rr, segi), rr);
     }
@@ -269,13 +270,14 @@
     var nomor = '';
     if (opts.nomor) {
       var rn = opts.ukuranNomor || 11;
-      var daftar = [];
+      var daftar = [], rintangan = segi.slice();
       cells.forEach(function (c, ci) {
         var no = opts.nomor[c.face];
         if (!no) return;
-        var t = titikNomor(segi[ci], segi, rn);
+        var t = titikNomor(segi[ci], rintangan, rn);
         t.no = no;
         daftar.push(t);
+        rintangan.push(cakramNomor(t, rn));   // nomor berikutnya menghindari yang ini
       });
       nomor = gambarNomor(renggangkan(daftar, rn, segi), rn);
     }
@@ -373,6 +375,16 @@
    * @param semua   semua poligon pada gambar, untuk memastikan bulatan tidak
    *                jatuh menimpa sisi tetangga
    */
+  /** Poligon segidelapan yang membungkus bulatan nomor — dipakai sebagai rintangan. */
+  function cakramNomor(t, r) {
+    var out = [];
+    for (var k = 0; k < 8; k++) {
+      var a = k * Math.PI / 4;
+      out.push([t.x + Math.cos(a) * r * 1.08, t.y + Math.sin(a) * r * 1.08]);
+    }
+    return out;
+  }
+
   function titikNomor(poly, semua, r) {
     var cx = 0, cy = 0, i;
     for (i = 0; i < poly.length; i++) { cx += poly[i][0]; cy += poly[i][1]; }

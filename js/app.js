@@ -509,12 +509,6 @@
     $('answer-reveal').textContent = 'Kunci: ' + q.answerLetter + ' (' + q.describe + ').';
   }
 
-  var _pool = null;
-  /**
-   * Kolam bangun pembanding: seluruh katalog + sejumlah bentuk tak beraturan.
-   * Dipakai sebagai sumber pengecoh untuk tipe B (polos), C, dan D. Dihitung
-   * sekali lalu disimpan karena mencari jaring-jaringnya memakan waktu.
-   */
   /**
    * Indeks tata letak jaring acak, mendahulukan pita utuh. Pita terputus
    * membentuk L atau T yang terbaca seperti bangun melengkung padahal bangun
@@ -531,6 +525,12 @@
     return kolam[Math.floor(Math.random() * kolam.length)];
   }
 
+  var _pool = null;
+  /**
+   * Kolam bangun pembanding: seluruh katalog + sejumlah bentuk tak beraturan.
+   * Dipakai sebagai sumber pengecoh untuk tipe B (polos), C, dan D. Dihitung
+   * sekali lalu disimpan karena mencari jaring-jaringnya memakan waktu.
+   */
   function poolBentuk() {
     if (!_pool) {
       _pool = [];
@@ -572,8 +572,9 @@
         var sd = null;
         for (var t = 0; t < 40 && !sd; t++) {
           var c = Solids.build('acak', { benih: bn + t });
-          // kenali dari susunan sisinya: limas terpancung punya sisi trapesium
-          if (/trapesium/.test(Solids.compositionText(c))) sd = c;
+          // kenali dari jaringnya yang melengkung; sisi trapesium saja tidak cukup,
+          // sebab prisma beratap miring juga bersisi trapesium padahal jaringnya lurus
+          if (Solids.jaringMelengkung(c)) sd = c;
         }
         if (!sd) return;
         var jr = Solids.nets(sd, 8);

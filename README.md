@@ -55,18 +55,39 @@ Selain kesembilan bangun baku, tersedia **bangun tak beraturan** yang dipakai
 Cocok untuk tipe B, C, dan D (tipe A butuh gambar sisi untuk membedakan orientasi,
 jadi pada paket campuran tipe A otomatis dialihkan).
 
-Bentuknya dibangkitkan, bukan digambar manual, dari **empat keluarga**:
+Bentuknya dibangkitkan, bukan digambar manual, dari **tujuh keluarga**:
 
 | Keluarga | Cara dibuat | Hasilnya |
 |---|---|---|
-| poliomino | 3–7 petak yang menempel, tepinya ditelusuri jadi penampang, lalu diekstrusi | profil L, V, T, U, balok bertakik |
-| poliomino terpangkas | satu sudut siku dipotong tepat satu petak | bentuk dengan bidang miring |
+| poliomino | 3–7 petak yang menempel, tepinya ditelusuri jadi penampang, lalu diekstrusi; sebagian dipangkas satu atau dua sudut | profil L, V, T, U, balok bertakik, bidang miring |
+| kisi segitiga (poliamond) | 3–6 segitiga sama sisi yang menempel, lalu diekstrusi | prisma trapesium 60°, jajar genjang, segienam, anak panah |
+| templat klasik | rumah, anak panah, layang-layang, perahu, segidelapan, tanda panah, trapesium — dengan getaran ±6–15% dan pencerminan acak | bentuk yang dikenali sekilas |
 | penampang cembung | poligon cembung acak 4–6 sisi, lalu diekstrusi | prisma trapesium, segilima/segienam tak beraturan |
-| limas terpancung | dua poligon sejajar berbeda ukuran + sisi trapesium | limas terpotong, jaringnya berbentuk kipas |
+| beratap miring | penampang dari tiga keluarga di atas, tutupnya diletakkan pada bidang condong | balok/prisma yang dipotong serong; sisi tegaknya trapesium berbeda tinggi |
+| limas terpancung beraturan | alas segi-4/5/6 beraturan, tutup 68–88% alas | limas terpotong, jaringnya kipas |
+| limas terpancung cembung | alas cembung acak, tutup diperkecil 68–88% | limas terpotong tak beraturan |
 
-Keempat keluarga bersama menghasilkan **471 bangun berbeda dari 365 penampang**,
-masing-masing dengan ~8 jaring-jaring — sekitar **3.740 pasangan bentuk × jaring**.
-Jumlah sisinya menyebar dari 6 sampai 11.
+Semua keluarga kecuali dua limas terpancung adalah **prisma berusuk tegak sejajar**,
+sehingga jaring pitanya membuka lurus — termasuk yang beratap miring, sebab tutup
+yang berbeda luas tidak mengubah arah rusuk tegaknya. Ketujuh keluarga bersama
+menghasilkan **527 bangun berbeda dari 395 penampang**, masing-masing dengan ~8
+jaring-jaring — sekitar **4.140 pasangan bentuk × jaring**. Jumlah sisinya menyebar
+dari 6 sampai 11.
+
+**Semua hasil acak melewati satu penyaring keterbacaan yang sama** sebelum
+dipakai; yang gagal diacak ulang (paling banyak delapan kali, lalu jatuh ke profil
+L cadangan). Empat ukurannya dihitung dari geometri bangun mentah:
+
+| Ukuran | Batas | Yang dicegah |
+|---|---|---|
+| luas sisi terkecil : terbesar | ≥ 0,15 | sisi setipis bilah yang tidak terbaca |
+| sudut dihedral terkecil antar sisi bertetangga | ≥ 50° | tepi setajam pisau |
+| rusuk terpendek : terpanjang | ≥ 0,22 | rusuk sependek titik |
+| tebal : lebar kotak pembatas | ≥ 0,36 | bangun gepeng yang terbaca sebagai lempengan |
+
+Diukur pada 400 bentuk: luas sisi terkecil paling rendah 0,19 kali sisi terbesar
+(median 0,32–0,62 per keluarga), sudut dihedral terkecil 53°, dan tiap bentuk
+memperlihatkan minimal 3 sisi pada pose terpilih.
 
 **Garis lipatan digambar putus-putus.** Rusuk yang dimiliki dua sisi adalah garis
 lipatan; yang hanya dimiliki satu sisi adalah tepi luar. Karena itu rusuk digambar
@@ -102,7 +123,7 @@ terlalu bebas menghasilkan gambar yang tidak bisa dibayangkan lipatannya:
 | penampang cembung: rusuk terpendek ≥ 0,42 kali terpanjang, kotak pembatas tidak gepeng | penampang gepeng membuat bangunnya tampak seperti kartu tipis |
 | pemangkasan sudut tepat satu petak | rusuk miringnya jadi sepanjang akar 2, lebih panjang daripada rusuk terpendek, jadi tidak pernah lahir bilah tipis |
 | penampang 6–8 rusuk | penampang berusuk 10+ berbentuk seperti sisir bergigi: di gambar 3D terbaca sebagai tumpukan bilah dan pita jaringnya memanjang jadi belasan kotak sempit |
-| tebal ekstrusi 0,40–1,03 kali penampang | kalau terlalu tipis, pita jaringnya memanjang seperti penggaris dan kedua tutupnya tampak kecil |
+| tebal ekstrusi 0,40–1,03 kali penampang (0,50–0,95 untuk kisi segitiga dan templat yang penampangnya lebar; badan prisma beratap miring ≥ 0,55) | kalau terlalu tipis, pita jaringnya memanjang seperti penggaris dan kedua tutupnya tampak kecil |
 
 **Jaring-jaringnya memakai tata letak pita.** Sisi tegak dibuka lurus menjadi satu
 pita mendatar, lalu kedua tutup ditempelkan pada sisi tegak yang dipilih — bentuk
@@ -125,6 +146,11 @@ yang dulu membuat jaring bangun bersudut siku pun terbaca membelok:
 
 Kelengkungan yang tersisa hanya milik limas terpancung, dan di situ memang tidak
 terhindarkan: selimut limas terpancung sungguh-sungguh membuka menjadi kipas.
+Pengenalnya mengukur **kesejajaran rusuk tegak** (rusuk yang dimiliki dua sisi
+tegak bertetangga), bukan selisih luas tutup — ukuran luas keliru menggolongkan
+prisma beratap miring sebagai melengkung, padahal rusuk tegaknya sejajar dan
+pitanya lurus (diukur: 0° untuk 176 prisma tegak dan 38 prisma beratap miring;
+38° median untuk 46 limas terpancung).
 Karena itu **jaring melengkung tidak pernah dicampur dengan jaring lurus dalam satu
 soal** — bangun kotak yang berpengecoh jaring kipas bisa dicoret tanpa membayangkan
 lipatannya sama sekali, dan sebaliknya. Diperiksa `campur.js`: dari 360 soal polos,
@@ -236,7 +262,9 @@ Bulatan nomor selalu diletakkan **di luar** sisinya dengan garis penunjuk pendek
 yang berujung di dalam sisi tersebut. Ditaruh di dalam, bulatan sebesar itu pasti
 menutupi corak pada sisi yang kecil — padahal corak itulah yang harus dibaca.
 Penempatnya menguji jarak bulatan ke setiap sisi, jadi tidak ada nomor yang
-menimpa gambar atau menimpa nomor lain.
+menimpa gambar atau menimpa nomor lain: nomor ditempatkan berurutan, dan setiap
+bulatan yang sudah terpasang ikut menjadi rintangan bagi nomor berikutnya — tanpa
+itu dua nomor bisa memperebutkan celah yang sama pada jaring yang rapat.
 
 PDF disusun langsung tanpa pustaka luar: gambar disisipkan sebagai XObject
 `DeviceGray` bila hitam-putih (datanya sepertiga) atau `DeviceRGB` bila berwarna,
