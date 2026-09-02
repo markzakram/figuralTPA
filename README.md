@@ -212,14 +212,14 @@ pembahasan memakai arah kalimat yang sesuai.
 5. **Buat soal.** Pilih tipe soal (dan tingkat kesulitan untuk tipe A) lalu tekan
    *Buat soal*. Tombol A–E di bawah lembar soal bisa diklik untuk mengecek jawaban
    beserta alasannya.
-6. **Buat sepaket dan unduh PDF.** Isi *Jumlah* soal, pilih variasinya, tekan
-   **Generate**, lalu **Unduh PDF**.
+6. **Buat sepaket dan unduh.** Isi *Jumlah* soal, pilih variasinya, tekan
+   **Generate**, lalu **Unduh PDF** (siap cetak) atau **Unduh Word** (siap sunting).
 
 Pilihan terakhir tersimpan otomatis di peramban.
 
 ## Membuat banyak soal sekaligus
 
-Panel *Buat banyak soal & unduh PDF* menerima jumlah soal (1–200) dengan dua pilihan
+Panel *Buat banyak soal & unduh* menerima jumlah soal (1–200) dengan dua pilihan
 variasi:
 
 | Pilihan | Arti |
@@ -245,7 +245,10 @@ Mengikuti format PDF generator *diagrammatical*: halaman **1440 × 810 pt**
 1. **Judul** — nomor soal, tipe soal, dan tingkat kesulitan (berwarna).
 2. **Gambar soal** — jaring-jaring atau bangun ruang, tergantung tipe.
 3. **Pilihan A–E**.
-4. **Kunci & pembahasan** — gambar bernomor di kiri, uraian di kanan.
+4. **Kunci & pembahasan** — gambar bernomor di kiri, uraian di kanan. (Pada berkas
+   Word gambarnya berada di atas uraian, karena itu kalimat rujukannya menyebut
+   "gambar pembahasan" tanpa kata penunjuk arah — kalimat yang menyebut posisi
+   pasti keliru di salah satu format.)
 
 ### Pembahasan bernomor
 
@@ -274,6 +277,34 @@ selesai dalam ~1,2 detik.
 
 Tombol *Cetak* tetap ada untuk mencetak bank soal sebagai lembar A4 biasa (kunci
 jawaban di halaman terakhir).
+
+## Format Word (.docx)
+
+Tombol **Unduh Word** menghasilkan berkas yang bisa langsung disunting: soalnya
+dapat diubah kalimatnya, gambarnya dipindahkan, atau nomornya disusun ulang.
+Halaman **A4 melintang** dengan tepi 2 cm, dan **dua halaman per soal**:
+
+1. **Halaman soal** — nomor, tipe, tingkat kesulitan, gambar soal, dan pilihan A–E.
+2. **Halaman pembahasan** — kunci, gambar bernomor, dan uraian tiap pengecoh.
+
+PDF memakai empat halaman karena formatnya layar 16:9; untuk berkas yang akan
+disunting, dua halaman A4 lebih ringkas tanpa kehilangan isi.
+
+**Penyusunnya ditulis sendiri, tanpa pustaka luar.** Sebuah `.docx` adalah arsip ZIP
+berisi XML, jadi `js/docx.js` bekerja dua lapis: penulis ZIP di bawah (header lokal,
+direktori pusat, EOCD, CRC-32, deflate mentah lewat `CompressionStream`) dan penyusun
+WordprocessingML di atasnya. Gambar disematkan sebagai **PNG** — format gambar yang
+dipahami Word — dan ukuran tampilnya ditetapkan dalam EMU agar muat pada halaman
+tanpa bergantung pada dugaan dpi.
+
+Berbeda dari PDF yang teksnya harus Latin-1, Word menyimpan teks sebagai **UTF-8**
+sehingga tanda panah pada "Jaring-jaring → bangun ruang" tetap tertulis sebagaimana
+adanya, bukan diganti "->".
+
+Diuji dengan membuka hasilnya di **Microsoft Word 16.0**: berkas terbuka tanpa dialog
+perbaikan, 8 soal menjadi 16 halaman dengan 24 gambar, orientasi melintang, dan
+seluruh teks terbaca utuh. Keabsahan arsipnya juga diperiksa terpisah oleh pembaca
+ZIP .NET, bukan oleh penulis ZIP yang sama.
 
 ## Cara kerja & jaminan kebenaran
 

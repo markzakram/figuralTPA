@@ -729,7 +729,10 @@
     }
 
     if (q.nomorSisi && (q.type === 'toSolid' || (q.type === 'toNet' && !q.polos))) {
-      out.push('Nomor sisi pada gambar di samping dipakai sebagai acuan penjelasan berikut.');
+      // Tanpa kata penunjuk arah: pada PDF gambarnya di samping teks, pada
+      // berkas Word gambarnya di atas teks — kalimat yang menyebut salah satu
+      // posisi pasti keliru di format yang lain.
+      out.push('Nomor sisi pada gambar pembahasan dipakai sebagai acuan penjelasan berikut.');
     }
 
     out.push('Mengapa opsi lain salah:');
@@ -890,6 +893,49 @@
       $('btn-batch').disabled = false;
       renderBank();
       changed();
+    }
+  }
+
+  /**
+   * Unduh seluruh bank soal sebagai berkas Word: 2 halaman per soal (halaman
+   * soal dan halaman pembahasan). Gambarnya disematkan sebagai PNG, bukan
+   * piksel mentah seperti pada PDF, karena itulah format gambar yang dipahami
+   * Word.
+   */
+  async function downloadDOCX() {
+    if (!state.bank.length) { batchStatus('Bank soal masih kosong — tekan Generate dulu.', true); return; }
+    var bar = $('batch-progress');
+    bar.hidden = false; bar.max = state.bank.length; bar.value = 0;
+    $('btn-docx').disabled = true;
+
+    try {
+      var soal = [];
+      for (var i = 0; i < state.bank.length; i++) {
+        var it = state.bank[i];
+        soal.push({
+          no: i + 1,
+          tipe: it.tipe,
+          tingkat: it.tingkat,
+          jawaban: it.letter,
+          pembahasan: it.pembahasan,
+          gambarSoal: await Raster.svgKePngBytes(it.soalSvg, 2),
+          gambarPilihan: await Raster.svgKePngBytes(it.pilihanSvg, 2),
+          gambarPembahasan: it.pembahasanSvg ? await Raster.svgKePngBytes(it.pembahasanSvg, 2) : null
+        });
+        bar.value = i + 1;
+        batchStatus('Menyiapkan halaman ' + (i + 1) + '/' + state.bank.length + '…');
+        if (i % 3 === 2) await jeda();
+      }
+      batchStatus('Memampatkan berkas Word…');
+      var blob = await Docx.buat(soal, {});
+      Raster.unduhBlob(blob, 'soal-bangun-ruang-' + state.bank.length + 'soal.docx');
+      batchStatus('Word siap: ' + (state.bank.length * 2) + ' halaman dari ' + state.bank.length +
+        ' soal (' + (blob.size / 1048576).toFixed(1) + ' MB).');
+    } catch (e) {
+      batchStatus('Ekspor Word gagal: ' + e.message, true);
+    } finally {
+      bar.hidden = true;
+      $('btn-docx').disabled = false;
     }
   }
 
@@ -1207,6 +1253,7 @@
     $('btn-add-bank').addEventListener('click', function () { addToBank(); });
     $('btn-batch').addEventListener('click', batchGenerate);
     $('btn-pdf').addEventListener('click', downloadPDF);
+    $('btn-docx').addEventListener('click', downloadDOCX);
     $('btn-print').addEventListener('click', printBank);
     $('btn-clear-bank').addEventListener('click', function () {
       state.bank = []; renderBank(); batchStatus('');
