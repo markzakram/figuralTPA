@@ -394,8 +394,11 @@
       isi.push(paragraf('Pembahasan:', { gaya: 'Heading3', jarakSesudah: 200 }));
       var kiri = sisipkan(s.gambarPembahasan,
         (KOL_GAMBAR - 240) * TWIP_KE_EMU, ISI_TINGGI * 0.62, 'Pembahasan soal ' + s.no);
+      // Ukuran huruf mengikuti pilihan PDF (lihat Pdf.ukuranPembahasan): pembahasan
+      // yang panjang mengecil sendiri sehingga tetap muat pada satu halaman.
+      var pt = s.ptTeks || 20;
       var kanan = (s.pembahasan || []).map(function (p) {
-        return paragraf(p, { ukuran: 20, jarakSesudah: 140 });
+        return paragraf(p, { ukuran: pt, jarakSesudah: Math.round(pt * 7) });
       }).join('');
       if (kiri) isi.push(tabelDuaKolom(kiri, kanan));
       else isi.push(kanan);

@@ -1417,6 +1417,64 @@
    * dan pada bangun bersudut siku pun terlihat membelok — padahal bangunnya
    * sendiri tidak menirus. Yang lurus didahulukan saat memilih tata letak.
    */
+  /**
+   * Adakah PERTEMUAN T pada jaring: sudut sebuah petak jatuh di tengah rusuk
+   * petak lain, bukan di sudutnya?
+   *
+   * Petak yang bersentuhan sudut-ke-sudut lazim dan tidak membingungkan — jaring
+   * kubus baku pun begitu. Yang meragukan adalah sudut yang menyodok tengah rusuk:
+   * di kertas ia terbaca sebagai dua bidang yang saling menyilang, dan kalau
+   * sodokan itu menutup mulut cerukan sebuah tutup, celah putih di dalamnya
+   * terbaca sebagai lubang pada jaring — padahal jaringnya sendiri sah.
+   */
+  function pertemuanT(cells) {
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    cells.forEach(function (c) {
+      c.poly.forEach(function (p) {
+        if (p[0] < x0) x0 = p[0];
+        if (p[0] > x1) x1 = p[0];
+        if (p[1] < y0) y0 = p[1];
+        if (p[1] > y1) y1 = p[1];
+      });
+    });
+    var eps = Math.max(x1 - x0, y1 - y0) * 0.004;
+    for (var a = 0; a < cells.length; a++) {
+      for (var b = 0; b < cells.length; b++) {
+        if (a === b) continue;
+        var pa = cells[a].poly, pb = cells[b].poly;
+        for (var k = 0; k < pa.length; k++) {
+          var p = pa[k];
+          for (var i = 0; i < pb.length; i++) {
+            var u = pb[i], v = pb[(i + 1) % pb.length];
+            var ex = v[0] - u[0], ey = v[1] - u[1];
+            var L2 = ex * ex + ey * ey;
+            if (L2 < eps * eps) continue;
+            var t = ((p[0] - u[0]) * ex + (p[1] - u[1]) * ey) / L2;
+            if (t <= 0 || t >= 1) continue;
+            var jx = p[0] - (u[0] + t * ex), jy = p[1] - (u[1] + t * ey);
+            if (jx * jx + jy * jy > eps * eps) continue;
+            // dekat salah satu ujung rusuk = sentuhan sudut biasa, bukan pertemuan T
+            var du = Math.hypot(p[0] - u[0], p[1] - u[1]);
+            var dv = Math.hypot(p[0] - v[0], p[1] - v[1]);
+            if (Math.min(du, dv) > eps * 4) return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Buang jaring yang punya pertemuan T. Kalau SELURUH jaring sebuah bangun
+   * bermasalah, daftarnya dikembalikan apa adanya — lebih baik satu jaring yang
+   * kurang enak dibaca daripada bangun yang tidak punya jaring sama sekali.
+   * (Diukur pada 200 bentuk: tidak ada yang kehabisan, paling sedikit tersisa 10.)
+   */
+  function saringPertemuanT(daftar) {
+    var bersih = daftar.filter(function (n) { return !pertemuanT(n.cells); });
+    return bersih.length ? bersih : daftar;
+  }
+
   function netLurus(net) { return !!(net && net.lurus); }
 
   function nets(solid, limit) {
@@ -1429,7 +1487,7 @@
     // (prisma segitiga 9, prisma segienam 12, dan seterusnya).
     if (solid.pita || hitungKombinasi(E.length, need) > 2e5) {
       var pita = netsPita(solid, limit);
-      if (pita) return pita;
+      if (pita) return saringPertemuanT(pita);
     }
 
     function simpan(edges, key) {
@@ -1472,6 +1530,8 @@
         for (var j = p + 1; j < need; j++) idx[j] = idx[j - 1] + 1;
       }
     }
+
+    out = saringPertemuanT(out);
 
     // yang paling "berimbang" lebih dulu — bentuk seperti salib/T muncul di awal daftar
     out.sort(function (a, b) {
@@ -1898,7 +1958,7 @@
     ketirusan: ketirusan, jaringMelengkung: jaringMelengkung,
     faceShapeLabel: faceShapeLabel, facePoly2D: facePoly2D,
     symmetries: symmetries, isSpanningTree: isSpanningTree, treeKey: treeKey,
-    polyOverlap: polyOverlap, unfold: unfold, netLurus: netLurus,
+    polyOverlap: polyOverlap, unfold: unfold, netLurus: netLurus, pertemuanT: pertemuanT,
     irregularSolid: irregularSolid, mulberry32: mulberry32, strukturPrisma: strukturPrisma,
     poliamond: poliamond, templatePenampang: templatePenampang, ukurKeterbacaan: ukurKeterbacaan,
     frustumSolid: frustumSolid, atapMiring: atapMiring, ekstrusi: ekstrusi,

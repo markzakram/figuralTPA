@@ -90,6 +90,83 @@
   }
 
   /**
+   * Susun teks halaman pembahasan supaya SELALU muat pada halamannya.
+   *
+   * Sejak pembahasan memuat alasan kunci DAN alasan tiap pengecoh, panjangnya
+   * hampir dua kali lipat; pada ukuran tetap 20 pt bagian akhirnya terpotong di
+   * tepi bawah halaman. Karena itu ukuran huruf dicoba dari yang terbesar ke yang
+   * terkecil, dan kalau satu kolom tetap tidak cukup teksnya dipecah menjadi dua
+   * kolom — halaman ini lebar (1440 pt), jadi dua kolom pun masih lega dibaca.
+   *
+   * @returns {{isi:string, ukuran:number, kolom:number}}
+   */
+  function susunPembahasan(soal, x, lebar, yAtas, tinggi, ukur) {
+    var blok = [
+      { teks: 'Jawaban: ' + soal.jawaban, ukuran: 30, tebal: true, sesudah: 16 },
+      { teks: 'Pembahasan:', ukuran: 22, tebal: true, sesudah: 8 }
+    ];
+    (soal.pembahasan || []).forEach(function (p) {
+      blok.push({ teks: p, badan: true, sesudah: 9 });
+    });
+
+    /** Ubah blok menjadi deretan baris siap tulis pada ukuran badan tertentu. */
+    function baris(pt, lebarKolom) {
+      var out = [];
+      blok.forEach(function (b) {
+        var uk = b.badan ? pt : b.ukuran;
+        var spasi = Math.round(uk * 1.45);
+        var potongan = penggal(b.teks, lebarKolom, ukur, b.tebal, uk);
+        potongan.forEach(function (t, i) {
+          out.push({
+            t: t, uk: uk, tebal: !!b.tebal, spasi: spasi,
+            sesudah: i === potongan.length - 1 ? b.sesudah : 0
+          });
+        });
+      });
+      return out;
+    }
+
+    /** Tempatkan baris ke kolom; null kalau tidak muat. */
+    function tata(br, kolom, lebarKolom, jarak) {
+      var bagian = [], k = 0, y = yAtas;
+      for (var i = 0; i < br.length; i++) {
+        var r = br[i];
+        if (y - r.spasi < yAtas - tinggi) {
+          k++;
+          if (k >= kolom) return null;          // kolom habis: ukuran ini tidak muat
+          y = yAtas;
+        }
+        if (r.t !== '') {
+          bagian.push(aliranTeks([r.t], x + k * (lebarKolom + jarak), y,
+            r.uk, r.spasi, ukur, r.tebal).isi);
+        }
+        y -= r.spasi + r.sesudah;
+      }
+      return bagian.join('\n');
+    }
+
+    var pt, hasil;
+    for (pt = 20; pt >= 13; pt--) {
+      hasil = tata(baris(pt, lebar), 1, lebar, 0);
+      if (hasil !== null) return { isi: hasil, ukuran: pt, kolom: 1 };
+    }
+    var jarak = 30, lebarKolom = (lebar - jarak) / 2;
+    for (pt = 17; pt >= 10; pt--) {
+      hasil = tata(baris(pt, lebarKolom), 2, lebarKolom, jarak);
+      if (hasil !== null) return { isi: hasil, ukuran: pt, kolom: 2 };
+    }
+    // Jalan terakhir: dua kolom pada ukuran terkecil. Sejauh diuji tidak pernah
+    // tercapai — dua kolom 10 pt memuat sekitar 90 baris, sedangkan pembahasan
+    // terpanjang hanya 34 baris.
+    return { isi: tata(baris(10, lebarKolom), 99, lebarKolom, jarak) || '', ukuran: 10, kolom: 2 };
+  }
+
+  /** Ukuran huruf badan pembahasan yang terpilih — dipakai juga oleh berkas Word. */
+  function ukuranPembahasan(soal, lebar) {
+    return susunPembahasan(soal, 0, lebar, TINGGI - 110, TINGGI - 170, buatPengukur()).ukuran;
+  }
+
+  /**
    * @param {Array} soal daftar soal:
    *        { no, tipe, tingkat, jawaban, pembahasan:[string], gambarSoal, gambarPilihan }
    *        gambar* = { lebar, tinggi, data, kanal }
@@ -188,19 +265,9 @@
             (100 + (480 - gw) / 2).toFixed(2) + ' ' + ((TINGGI - gh) / 2).toFixed(2) + ' cm /Im0 Do Q');
         }
 
-        var judul = 'Jawaban: ' + s.jawaban;
-        var bagian = [aliranTeks([judul], xTeks, TINGGI - 110, 30, 44, ukur, true)];
-        var yy = bagian[0].yAkhir - 16;
-        var b = aliranTeks(['Pembahasan:'], xTeks, yy, 22, 34, ukur, true);
-        bagian.push(b);
-        yy = b.yAkhir - 4;
-        (s.pembahasan || []).forEach(function (p) {
-          var baris = penggal(p, lebarIsi, ukur, false, 20);
-          var c = aliranTeks(baris, xTeks, yy, 20, 29, ukur, false);
-          bagian.push(c);
-          yy = c.yAkhir - 9;
-        });
-        isiJwb.push(bagian.map(function (x) { return x.isi; }).join('\n'));
+        var yAtas = TINGGI - 110;
+        var tata = susunPembahasan(s, xTeks, lebarIsi, yAtas, yAtas - 60, ukur);
+        isiJwb.push(tata.isi);
         buatHalaman(isiJwb.join('\n'), adaGambar ? no[2] : null);
       });
     });
@@ -243,5 +310,8 @@
     });
   }
 
-  return { buat: buat, LEBAR: LEBAR, TINGGI: TINGGI, penggal: penggal, keLatin1: keLatin1 };
+  return {
+    buat: buat, LEBAR: LEBAR, TINGGI: TINGGI, penggal: penggal, keLatin1: keLatin1,
+    ukuranPembahasan: ukuranPembahasan
+  };
 });

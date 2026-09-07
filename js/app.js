@@ -662,27 +662,39 @@
    * kalimat "sisi 2 dan sisi 3 tertukar" tidak bisa ditelusuri pembaca.
    */
   function pembahasanDoc(q) {
-    var bernomor = (q.type === 'toSolid' || (q.type === 'toNet' && !q.polos)) && q.nomorSisi;
     var kunci = q.options[q.answerIndex];
     var kiri, kanan;
 
+    // Bangun polos tidak punya corak yang bisa ditelusuri, jadi sisinya DIWARNAI:
+    // warna yang sama menandai sisi yang sama pada kedua gambar. Inilah pengganti
+    // corak sebagai jejak visual, dan berlaku juga untuk penomorannya.
+    var polos = q.polos || !q.faces || q.faces.every(function (f) { return !f || Art.isBlank(f.art); });
+    var berwarna = polos && (q.type === 'toNet' || q.type === 'toShape')
+      ? Render.paletSisi(q.solid.faces.length) : null;
+    var bernomor = q.nomorSisi && (q.type === 'toSolid' || q.type === 'toShape' ||
+      (q.type === 'toNet' && (!q.polos || berwarna)));
+    var hiasSolid = { strokeWidth: 2, warnaSisi: berwarna, ukuranNomor: 12 };
+    var hiasNet = { warnaSisi: berwarna, ukuranNomor: 11 };
+
     if (q.type === 'toNet') {
       kiri = Render.solidView(q.solid, q.faces, 150,
-        { strokeWidth: 2, nomor: bernomor ? q.nomorSisi : null, ukuranNomor: 12 });
+        Object.assign({}, hiasSolid, { nomor: bernomor ? q.nomorSisi : null }));
       kanan = kunci && kunci.net
         ? netFit(kunci.net.cells, kunci.faces, 250, 190, 2,
-            { nomor: bernomor ? q.nomorNet : null, ukuranNomor: 11 })
+            Object.assign({}, hiasNet, { nomor: bernomor ? q.nomorNet : null }))
         : null;
     } else if (q.type === 'toSolid') {
       var cells = q.netCells || netCells();
       kiri = cells ? netFit(cells, q.faces, 250, 190, 2,
-        { nomor: bernomor ? q.nomorNet : null, ukuranNomor: 11 }) : null;
+        Object.assign({}, hiasNet, { nomor: bernomor ? q.nomorNet : null })) : null;
       kanan = kunci ? Render.solidView(q.solid, kunci.faces, 150,
-        { strokeWidth: 2, nomor: bernomor ? q.nomorSisi : null, ukuranNomor: 12 }) : null;
+        Object.assign({}, hiasSolid, { nomor: bernomor ? q.nomorSisi : null })) : null;
     } else if (q.type === 'toShape') {
       var c2 = q.netCells || netCells();
-      kiri = c2 ? netFit(c2, null, 250, 190, 2) : null;
-      kanan = kunci ? Render.solidView(kunci.solid, null, 150, { strokeWidth: 2 }) : null;
+      kiri = c2 ? netFit(c2, null, 250, 190, 2,
+        Object.assign({}, hiasNet, { nomor: bernomor ? q.nomorSisi : null })) : null;
+      kanan = kunci ? Render.solidView(kunci.solid, null, 150,
+        Object.assign({}, hiasSolid, { nomor: bernomor ? q.nomorSisi : null })) : null;
     } else {
       kiri = Render.solidView(q.solid, null, 150, { strokeWidth: 2 });
       kanan = kunci ? Render.shapes(kunci.comp, 96, { strokeWidth: 1.8 }) : null;
@@ -711,29 +723,10 @@
 
   /** Uraian jawaban untuk halaman pembahasan PDF. */
   function pembahasan(q) {
-    var L = q.answerLetter;
-    var out = [];        // judul "Jawaban:" dan "Pembahasan:" dicetak oleh pdf.js
-
-    if (q.type === 'toNet') {
-      out.push('Jaring-jaring pada opsi ' + L + ' dapat dilipat sehingga menghasilkan susunan ' +
-        'sisi yang sama dengan bangun ruang pada soal.');
-    } else if (q.type === 'toSolid') {
-      out.push('Bangun ruang pada opsi ' + L + ' merupakan hasil lipatan jaring-jaring pada soal, ' +
-        'sehingga susunan sisinya sama.');
-    } else if (q.type === 'toShape') {
-      out.push('Jaring-jaring pada soal tersusun dari ' + q.describe +
-        ', sehingga bila dilipat menghasilkan bangun ruang pada opsi ' + L + '.');
-    } else {
-      out.push('Bangun ruang pada soal dibatasi oleh ' + q.describe +
-        ', yaitu susunan bangun datar pada opsi ' + L + '.');
-    }
-
-    if (q.nomorSisi && (q.type === 'toSolid' || (q.type === 'toNet' && !q.polos))) {
-      // Tanpa kata penunjuk arah: pada PDF gambarnya di samping teks, pada
-      // berkas Word gambarnya di atas teks — kalimat yang menyebut salah satu
-      // posisi pasti keliru di format yang lain.
-      out.push('Nomor sisi pada gambar pembahasan dipakai sebagai acuan penjelasan berikut.');
-    }
+    // Judul "Jawaban:" dan "Pembahasan:" dicetak oleh pdf.js/docx.js.
+    // Mengapa kuncinya BENAR dijelaskan lebih dulu, baru mengapa yang lain salah:
+    // menyebut pengecohnya saja tidak mengajarkan cara membaca soalnya.
+    var out = Quiz.alasanKunci(q);
 
     out.push('Mengapa opsi lain salah:');
     q.options.forEach(function (o, i) {
@@ -756,16 +749,51 @@
       solid: q.solid.name,
       tipe: TIPE_LABEL[q.type] || '',
       tingkat: q.type === 'toSolid' ? (TINGKAT_LABEL[$('difficulty').value] || '') : '',
+      kunci: quizKey(q),
       pembahasanSvg: pembahasanDoc(q),
       pembahasan: pembahasan(q)
     });
     if (!diam) renderBank();
   }
 
+  function kunciCorak(faces) {
+    if (!faces) return '-';
+    return faces.map(function (f) { return Art.visualKey(f.art, f.rot); }).join(',');
+  }
+
+  /** Sidik tata letak jaring: nomor sisi tiap petak beserta letaknya. */
+  function kunciPetak(cells) {
+    if (!cells) return '-';
+    return cells.map(function (c) {
+      return c.face + ':' + Math.round(c.poly[0][0] * 1000) + ',' + Math.round(c.poly[0][1] * 1000);
+    }).sort().join(';');
+  }
+
+  function sidikOpsi(o) {
+    if (o.kind === 'net') return 'j' + kunciPetak(o.net.cells) + '/' + kunciCorak(o.faces);
+    if (o.kind === 'shape') return 'b' + Solids.shapeKey(o.solid);
+    if (o.kind === 'faces') return 'd' + Solids.compositionKey(o.solid);
+    return 's' + (o.sig || kunciCorak(o.faces));
+  }
+
+  /**
+   * Sidik satu soal utuh: pertanyaannya DAN kumpulan pilihannya.
+   *
+   * Sidik pilihan diurutkan lebih dulu, jadi dua soal yang isinya sama dan hanya
+   * berbeda urutan huruf tetap dikenali sebagai kembar. Pertanyaan yang sama
+   * dengan kumpulan pilihan yang berbeda tetap dianggap soal lain.
+   */
   function quizKey(q) {
-    return q.options.map(function (o) {
-      return o.sig || o.key || (o.solid && o.solid.id) || '';
-    }).join('||');
+    var soal = Solids.shapeKey(q.solid) + '#' + kunciCorak(q.faces) +
+      (q.netCells ? '#' + kunciPetak(q.netCells) : '');
+    return q.type + '@' + soal + '@' + q.options.map(sidikOpsi).sort().join('|');
+  }
+
+  /** Sidik seluruh soal yang sudah ada di bank. */
+  function kunciBank() {
+    var set = {};
+    state.bank.forEach(function (it) { if (it.kunci) set[it.kunci] = true; });
+    return set;
   }
 
   function renderBank() {
@@ -827,7 +855,9 @@
       // Kalau tipe yang diminta memang tipe A, bentuk polos tidak ikut diundi sama
       // sekali — bukan dialihkan diam-diam ke tipe lain.
       var idsBercorak = ids.filter(function (id) { return !Solids.CATALOG[id].polos; });
-      var dialihkan = 0;
+      var dialihkan = 0, kembar = 0, dilewati = 0;
+      var sudahAda = kunciBank();
+      var MAKS_ULANG = 12;
 
       for (var i = 0; i < jumlah; i++) {
         // Tipe ditetapkan ULANG tiap nomor. Sebelumnya nilainya hanya ditulis ke
@@ -865,7 +895,24 @@
 
         var alt = state.mode !== 'grid' && state.nets.length ? state.nets[state.netIndex].cells : null;
         if (state.mode === 'grid' || !alt) alt = netCells();
-        addToBank(makeQuiz(alt), true);
+        var q = makeQuiz(alt);
+
+        // Soal yang benar-benar kembar — pertanyaan DAN kumpulan pilihannya sama —
+        // dibuat ulang. Pertanyaan yang sama dengan pilihan berbeda tetap diterima.
+        for (var ulang = 0; ulang < MAKS_ULANG && sudahAda[quizKey(q)]; ulang++) {
+          kembar++;
+          if (state.mode !== 'grid' && state.nets.length > 1) state.netIndex = indeksJaringAcak(state.netIndex);
+          if (variasi !== 'tetap') state.faces = randomFaces();
+          if (variasi === 'bentuk' || (variasi === 'artSolid' && state.solidId === 'acak')) {
+            setSolid('acak', { benih: 1 + Math.floor(Math.random() * 99999) }, false);
+            state.faces = randomFaces();
+          }
+          alt = state.mode !== 'grid' && state.nets.length ? state.nets[state.netIndex].cells : netCells();
+          q = makeQuiz(alt);
+        }
+        if (sudahAda[quizKey(q)]) { dilewati++; bar.value = i + 1; continue; }
+        sudahAda[quizKey(q)] = true;
+        addToBank(q, true);
 
         bar.value = i + 1;
         // Melepas kendali tiap 10 soal sudah cukup menjaga antarmuka tetap
@@ -874,7 +921,10 @@
         // dicekik habis-habisan ketika tabnya sedang tidak ditampilkan.
         if (i % 10 === 9) { batchStatus('Membuat soal ' + (i + 1) + '/' + jumlah + '…'); await jeda(); }
       }
-      var pesan = jumlah + ' soal ditambahkan. Total di bank: ' + state.bank.length + '.';
+      var pesan = (jumlah - dilewati) + ' soal ditambahkan. Total di bank: ' + state.bank.length + '.';
+      if (kembar) pesan += ' ' + kembar + ' soal kembar dibuat ulang.';
+      if (dilewati) pesan += ' ' + dilewati + ' dilewati karena tetap kembar — ' +
+        'ragamnya sudah habis untuk pilihan bentuk ini.';
       if (dialihkan) {
         pesan += ' ' + dialihkan + ' di antaranya memakai bangun polos, jadi tipenya ' +
           'dialihkan ke bangun ruang \u2192 jaring-jaring.';
@@ -921,6 +971,9 @@
           pembahasan: it.pembahasan,
           gambarSoal: await Raster.svgKePngBytes(it.soalSvg, 2),
           gambarPilihan: await Raster.svgKePngBytes(it.pilihanSvg, 2),
+          // Ukuran huruf disamakan dengan yang dipilih PDF, supaya kedua berkas
+          // terbaca serupa dan pembahasan panjang tidak melimpah ke halaman lain.
+          ptTeks: Pdf.ukuranPembahasan({ jawaban: it.letter, pembahasan: it.pembahasan }, 774),
           gambarPembahasan: it.pembahasanSvg ? await Raster.svgKePngBytes(it.pembahasanSvg, 2) : null
         });
         bar.value = i + 1;

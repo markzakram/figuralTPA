@@ -114,6 +114,19 @@ tidak tampak dari sudut yang sama.
 Tiap bentuk punya nomor benih; benih yang sama selalu menghasilkan bentuk yang sama,
 dan tombol *Acak bentuk* mengambil benih baru.
 
+**Jaring dengan pertemuan T dibuang.** Sudut sebuah petak yang jatuh di TENGAH rusuk
+petak lain terbaca sebagai dua bidang yang saling menyilang; kalau sodokan itu
+menutup mulut cerukan sebuah tutup, celah putih di dalamnya terbaca sebagai lubang
+pada jaring. Petak yang bersentuhan sudut-ke-sudut tidak apa-apa — jaring kubus baku
+pun begitu. Sebelum disaring, 4,0% jaring bangun tak beraturan punya pertemuan T;
+sesudahnya 0%. Tidak ada bentuk yang kehabisan jaring: yang paling sedikit masih
+menyisakan 10 dari 21, dan rata-rata per bentuk hanya turun dari 7,9 ke 7,5.
+
+Empat dugaan lain sempat diukur dan ternyata BUKAN penyebabnya, jadi tidak ada aturan
+yang ditambahkan untuk itu: tepi jaring yang bukan satu gelang (0 kasus), tindihan
+petak pada raster bersama (0), petak yang terkurung selubung cembung petak lain (0),
+dan teluk putih bermulut sempit (0).
+
 Tiga batasan menjaga agar bentuknya tetap **terbaca**, karena bentuk acak yang
 terlalu bebas menghasilkan gambar yang tidak bisa dibayangkan lipatannya:
 
@@ -197,6 +210,20 @@ Diperiksa dari 16 kombinasi variasi × tipe (masing-masing 9 soal) dan sekali pa
 100 soal penuh: 100/100 halaman judul PDF menyebut tipe yang benar, 100/100 halaman
 pembahasan memakai arah kalimat yang sesuai.
 
+## Tidak ada soal yang benar-benar kembar
+
+Saat membuat banyak soal sekaligus, tiap soal disidik dari **pertanyaannya DAN
+kumpulan pilihannya**. Sidik pilihan diurutkan lebih dulu, jadi dua soal yang isinya
+sama dan hanya berbeda urutan huruf tetap dikenali kembar. Yang kembar dibuat ulang
+(paling banyak 12 kali); pertanyaan yang sama dengan kumpulan pilihan berbeda tetap
+diterima, karena itu memang soal lain.
+
+Diuji pada kasus paling rawan — tipe D dengan bangun dan corak yang sama sekali tidak
+diacak, sehingga ruang kemungkinannya sempit: dari 60 soal, 8 kembar dibuat ulang dan
+hasil akhirnya 60 lembar soal yang seluruhnya berbeda. Pemeriksaannya mandiri:
+membandingkan SVG lembar soal setelah id-nya dinormalkan, bukan memakai sidik yang
+sama dengan penjaganya.
+
 ## Alur pemakaian
 
 1. **Pilih bangun ruang.** Untuk balok, panjang/lebar/tinggi bisa diubah; jaring-jaring
@@ -247,6 +274,54 @@ Mengikuti format PDF generator *diagrammatical*: halaman **1440 × 810 pt**
 3. **Pilihan A–E**.
 4. **Kunci & pembahasan** — gambar bernomor di kiri, uraian di kanan. Berkas Word
    memakai susunan yang sama.
+
+### Mengapa kuncinya benar, bukan hanya mengapa yang lain salah
+
+Pembahasan dibuka dengan alasan pilihan yang BENAR, baru menyusul alasan tiap
+pengecoh. Kalimatnya bukan pernyataan kosong ("opsi C dapat dilipat menjadi bangun
+pada soal") melainkan bukti yang bisa ditelusuri sendiri di gambar, dan seluruhnya
+dihitung dari geometri bangunnya:
+
+| Soal | Bukti yang disebut |
+|---|---|
+| bercorak | sisi terlihat mana yang bertemu di satu titik sudut (diperiksa lewat simpul bersama), pasangan mana yang bersebelahan, dan sisi mana yang melipat ke bagian tersembunyi beserta lawan seberangnya |
+| polos | susunan sisinya, jumlah sisi tegak yang berderet dalam satu pita, dan cara kedua tutup bertemu saat pita dilipat melingkar |
+
+Klaim "bertemu di satu titik sudut" hanya ditulis kalau memang ada simpul yang
+dimiliki semua sisi itu; kalau tidak, yang ditulis rantai "sisi 1 bersebelahan
+dengan sisi 2" saja.
+
+### Warna sisi untuk bangun polos
+
+Bangun tak beraturan dipakai tanpa corak, jadi pada gambar pembahasannya tidak ada
+apa pun yang bisa ditelusuri mata dari jaring-jaring ke bangun ruangnya. Karena itu
+**sisinya diwarnai**: warna yang sama menandai sisi yang sama pada kedua gambar,
+berpasangan dengan nomor yang sama. Satu warna cukup ditelusuri untuk melihat ke
+mana sebuah petak jaring-jaring melipat. Nadanya sengaja muda supaya garis hitam dan
+bulatan nomor tetap terbaca di atasnya. Gambar soal dan gambar pilihan tetap polos —
+yang diwarnai hanya gambar pembahasan.
+
+### Pembahasan selalu muat pada halamannya
+
+Sejak pembahasan memuat alasan kunci DAN alasan tiap pengecoh, panjangnya hampir
+dua kali lipat: pada ukuran tetap 20 pt bagian akhirnya terpotong di tepi bawah.
+Ukuran huruf badan kini **dicoba dari 20 pt turun ke 13 pt** dan yang dipakai adalah
+yang terbesar yang masih muat; kalau satu kolom tetap kurang, teksnya dipecah
+menjadi **dua kolom** (halaman ini lebar 1440 pt, jadi dua kolom masih lega).
+Berkas Word memakai ukuran yang sama lewat , supaya kedua
+berkas terbaca serupa.
+
+Diperiksa dari PDF jadinya — koordinat tiap baris teks dibaca kembali dari perintah
+`Tm` pada aliran halaman, bukan dari penghitung yang menyusunnya:
+
+| | sebelum | sesudah |
+|---|---|---|
+| halaman pembahasan yang teksnya keluar halaman | 9 dari 9 | **0 dari 48** |
+| baris terjauh di bawah tepi | 90 pt | — |
+| ukuran huruf badan | 20 pt tetap | 16-20 pt menyesuaikan |
+
+Kasus terberat (prisma segienam, delapan sisi, pembahasan terpanjang) muat pada
+16 pt dalam satu kolom. Di Word, 0 dari 12 sel pembahasan melewati tepi bawah.
 
 ### Pembahasan bernomor
 

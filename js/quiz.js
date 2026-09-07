@@ -20,6 +20,10 @@
 })(typeof self !== 'undefined' ? self : this, function (Art, S) {
   'use strict';
 
+  // Gambar pembahasan mewarnai sisi yang sama dengan warna yang sama; tanpa corak,
+  // warna itulah satu-satunya jejak yang bisa ditelusuri pembaca.
+  var BANTUAN_WARNA = 'Pada gambar di atas, sisi yang sama diberi warna dan nomor yang sama pada kedua bangun — telusuri satu warna untuk melihat ke mana sisi itu melipat.';
+
   function copyFaces(faces) {
     return faces.map(function (f) { return { art: f.art, rot: f.rot }; });
   }
@@ -126,6 +130,131 @@
         'Sisi yang ukurannya berbeda tidak akan bertemu rapat ketika dilipat.';
     }
     return opt.reason || '';
+  }
+
+  /** Deretan nomor sisi menjadi kalimat: "sisi 1, sisi 2, dan sisi 3". */
+  function deretSisi(quiz, daftar, faces) {
+    var teks = daftar.map(function (i) {
+      var lbl = faces && faces[i] && faces[i].art ? Art.label(faces[i].art) : null;
+      return namaSisi(quiz, i, lbl);
+    });
+    if (teks.length <= 1) return teks[0] || '';
+    return teks.slice(0, -1).join(', ') + (teks.length > 2 ? ', dan ' : ' dan ') + teks[teks.length - 1];
+  }
+
+  function bersebelahan(solid, i, j) {
+    return solid.edges.some(function (e) {
+      return (e.a === i && e.b === j) || (e.a === j && e.b === i);
+    });
+  }
+
+  /** Adakah satu titik sudut yang dimiliki SEMUA sisi dalam daftar? */
+  function titikBersama(solid, daftar) {
+    if (daftar.length < 3) return false;
+    var awal = solid.faces[daftar[0]].v;
+    return awal.some(function (v) {
+      return daftar.every(function (i) { return solid.faces[i].v.indexOf(v) >= 0; });
+    });
+  }
+
+  /** Sisi yang sama sekali tidak bersinggungan dengan sisi `i` (berseberangan). */
+  function seberang(solid, i) {
+    var p = (solid.untouching || []).filter(function (q) { return q[0] === i || q[1] === i; });
+    return p.length ? (p[0][0] === i ? p[0][1] : p[0][0]) : null;
+  }
+
+  /**
+   * Mengapa pilihan yang BENAR itu benar.
+   *
+   * Menyatakan "opsi X dapat dilipat menjadi bangun pada soal" saja tidak
+   * mengajarkan apa pun — pembaca tetap tidak tahu apa yang harus diperhatikan.
+   * Kalimat di sini menyebut bukti yang bisa ditelusuri sendiri di gambar:
+   * sisi mana bersebelahan dengan sisi mana, mana yang bertemu di satu titik
+   * sudut, dan sisi mana yang melipat ke bagian yang tidak terlihat. Semuanya
+   * dihitung dari geometri bangunnya, jadi tidak ada klaim yang tidak terbukti.
+   */
+  function alasanKunci(quiz) {
+    var solid = quiz.solid, huruf = 'opsi ' + quiz.answerLetter;
+    var nomor = quiz.nomorSisi || {};
+    var out = [];
+    var opsi = quiz.options[quiz.answerIndex] || {};
+
+    if (quiz.type === 'toShape') {
+      out.push('Jaring-jaring pada soal tersusun dari ' + S.compositionText(solid) +
+        '. Bila dilipat, kedua tutupnya saling berhadapan dan sisi-sisi tegaknya menutup keliling, sehingga terbentuk bangun ruang pada ' + huruf + '.');
+      out.push(BANTUAN_WARNA);
+      return out;
+    }
+    if (quiz.type === 'toFaces') {
+      out.push('Bangun ruang pada soal dibatasi oleh ' + S.compositionText(solid) +
+        ', yaitu susunan bangun datar pada ' + huruf + '. Sisi yang bentuknya sama dikelompokkan menjadi satu, meskipun ukurannya berbeda.');
+      return out;
+    }
+
+    var keJaring = quiz.type === 'toNet';
+    var faces = keJaring ? quiz.faces : (opsi.faces || quiz.faces);
+
+    if (quiz.polos || !faces || faces.every(function (f) { return !f || Art.isBlank(f.art); })) {
+      // Bangun polos: yang membedakan hanya bentuk, jadi buktinya susunan sisinya.
+      var st = S.strukturPrisma(solid);
+      var kalimat = (keJaring ? 'Jaring-jaring pada ' + huruf : 'Bangun ruang pada ' + huruf) +
+        ' tersusun dari ' + S.compositionText(solid) + ', sama persis dengan bangun ruang pada soal.';
+      if (st) {
+        kalimat += ' Sisi tegaknya yang berjumlah ' + st.gelang.length +
+          ' berderet dalam satu pita, dan kedua tutupnya menempel pada pita itu; bila pita dilipat melingkar, kedua tutup bertemu di ujung atas dan bawah.';
+      }
+      out.push(kalimat);
+      out.push(BANTUAN_WARNA);
+      return out;
+    }
+
+    out.push(keJaring
+      ? 'Jaring-jaring pada ' + huruf + ' dapat dilipat sehingga menghasilkan susunan sisi yang sama dengan bangun ruang pada soal.'
+      : 'Bangun ruang pada ' + huruf + ' merupakan hasil lipatan jaring-jaring pada soal, sehingga susunan sisinya sama.');
+
+    // bukti yang bisa ditelusuri: sisi terlihat mana bersebelahan dengan mana
+    var tampak = solid.visible.slice().sort(function (a, b) { return nomor[a] - nomor[b]; });
+    if (tampak.length >= 2) {
+      if (titikBersama(solid, tampak)) {
+        out.push('Pada bangun ruang soal, ' + deretSisi(quiz, tampak, faces) +
+          ' bertemu di satu titik sudut. Ketiganya juga saling bersebelahan pada jaring-jaring ' + huruf + ', jadi setelah dilipat letak dan arah simbolnya tepat sama.');
+      } else {
+        var rantai = [];
+        for (var i = 0; i + 1 < tampak.length; i++) {
+          if (bersebelahan(solid, tampak[i], tampak[i + 1])) {
+            rantai.push(namaSisi(quiz, tampak[i], faces[tampak[i]] && Art.label(faces[tampak[i]].art)) +
+              ' bersebelahan dengan ' +
+              namaSisi(quiz, tampak[i + 1], faces[tampak[i + 1]] && Art.label(faces[tampak[i + 1]].art)));
+          }
+        }
+        if (rantai.length) {
+          // dua kaitan sudah cukup jadi bukti; merangkai seluruh sisi membuat
+          // kalimatnya berbelit dan justru sulit ditelusuri
+          out.push('Perhatikan bahwa ' + rantai.slice(0, 2).join(', serta ') +
+            ' — hubungan yang sama juga terlihat pada jaring-jaring ' + huruf +
+            ', dan tetap begitu setelah dilipat.');
+        }
+      }
+    }
+
+    // sisi yang melipat ke bagian tersembunyi
+    var sembunyi = [];
+    solid.faces.forEach(function (f) {
+      if (solid.visible.indexOf(f.index) < 0) sembunyi.push(f.index);
+    });
+    sembunyi.sort(function (a, b) { return nomor[a] - nomor[b]; });
+    if (sembunyi.length) {
+      var akhir = deretSisi(quiz, sembunyi, faces);
+      akhir = akhir.charAt(0).toUpperCase() + akhir.slice(1) +
+        ' melipat ke bagian yang tidak terlihat pada gambar soal';
+      var lawan = seberang(solid, tampak[0]);
+      if (lawan !== null && sembunyi.indexOf(lawan) >= 0) {
+        akhir += '; sisi ' + (nomor[lawan] || '?') + ' berseberangan dengan sisi ' +
+          (nomor[tampak[0]] || '?') + ' sehingga keduanya tidak pernah tampak bersamaan';
+      }
+      out.push(akhir + '.');
+    }
+    return out;
   }
 
   /** Tanda tangan visual: gambar apa yang tampak pada tiap sisi yang terlihat. */
@@ -473,8 +602,10 @@
     var answerIndex = -1;
     items.forEach(function (it, n) { if (it.correct) answerIndex = n; });
 
+    var nomorPolos = susunNomor(solid);
     return {
-      type: 'toNet', polos: true, nomorSisi: susunNomor(solid), solid: solid, faces: null, options: items,
+      type: 'toNet', polos: true, nomorSisi: nomorPolos, nomorNet: nomorPolos,
+      solid: solid, faces: null, options: items,
       answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
       warnings: warnings, describe: S.compositionText(solid)
     };
@@ -602,8 +733,10 @@
     var answerIndex = -1;
     items.forEach(function (it, k) { if (it.correct) answerIndex = k; });
 
+    var nomorBentuk = susunNomor(target);
     return {
-      type: 'toShape', nomorSisi: susunNomor(target), solid: target, faces: null, options: items,
+      type: 'toShape', nomorSisi: nomorBentuk, nomorNet: nomorBentuk,
+      solid: target, faces: null, options: items,
       answerIndex: answerIndex, answerLetter: String.fromCharCode(65 + answerIndex),
       warnings: warnings, describe: target.name.toLowerCase() + ' (' + S.compositionText(target) + ')'
     };
@@ -738,6 +871,7 @@
     generateFaceChoice: generateFaceChoice,
     netIsValid: netIsValid, audit: audit, auditAlt: auditAlt,
     describeView: describeView, ringkasSisi: ringkasSisi, shuffle: shuffle,
-    susunNomor: susunNomor, teksAlasan: teksAlasan, namaSisi: namaSisi
+    susunNomor: susunNomor, teksAlasan: teksAlasan, namaSisi: namaSisi,
+    alasanKunci: alasanKunci
   };
 });

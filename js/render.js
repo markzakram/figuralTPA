@@ -70,7 +70,7 @@
    *        jaring-jaring, yang menggambar rusuk pada lapisan tersendiri agar
    *        garis lipatan bisa dibuat putus-putus.
    */
-  function facePiece(poly, box, state, opts, id, tanpaGaris) {
+  function facePiece(poly, box, state, opts, id, tanpaGaris, warna) {
     var art = state && state.art;
     var rot = (state && state.rot) || 0;
     var stroke = tanpaGaris ? 'none' : (opts.stroke || '#111111');
@@ -78,7 +78,10 @@
     var body = Art.shape(art);
     var out = '', defs = '';
 
-    out += '<polygon points="' + pts(poly) + '" fill="' + Art.bgOf(art) + '"/>';
+    // Warna sisi hanya dipakai pada gambar pembahasan bangun POLOS: tanpa corak,
+    // warna adalah satu-satunya jejak yang menghubungkan petak jaring dengan sisi
+    // bangun ruangnya. Gambar soal dan pilihan tetap polos.
+    out += '<polygon points="' + pts(poly) + '" fill="' + (warna || Art.bgOf(art)) + '"/>';
 
     if (body) {
       var m = [box.U[0] / 100, box.U[1] / 100, box.V[0] / 100, box.V[1] / 100, box.o[0], box.o[1]];
@@ -128,7 +131,8 @@
       var pv = proj.project(S.matVec(M, S.add(f.box.o, f.box.V)));
       var piece = facePiece(poly, {
         o: o, U: [pu[0] - o[0], pu[1] - o[1]], V: [pv[0] - o[0], pv[1] - o[1]]
-      }, faces && faces[f.index], opts, prefix + f.index);
+      }, faces && faces[f.index], opts, prefix + f.index, false,
+        opts.warnaSisi && opts.warnaSisi[f.index]);
       body.push(piece.body);
       if (piece.defs) defs.push(piece.defs);
     });
@@ -222,7 +226,8 @@
     cells.forEach(function (c, ci) {
       var titik = segi[ci];
       var box = { o: P(c.box.o), U: D(c.box.U), V: D(c.box.V) };
-      var piece = facePiece(titik, box, faces && faces[c.face], opts, prefix + c.face, true);
+      var piece = facePiece(titik, box, faces && faces[c.face], opts, prefix + c.face, true,
+        opts.warnaSisi && opts.warnaSisi[c.face]);
       body.push('<g data-face="' + c.face + '" class="net-face">' + piece.body + '</g>');
       if (piece.defs) defs.push(piece.defs);
       for (var i = 0; i < titik.length; i++) catat(titik[i], titik[(i + 1) % titik.length]);
@@ -502,6 +507,23 @@
     }).join("");
   }
 
+  /**
+   * Warna sisi untuk gambar pembahasan bangun polos. Nadanya sengaja muda supaya
+   * garis hitam dan bulatan nomor tetap terbaca di atasnya, dan cukup berjauhan
+   * satu sama lain supaya dua sisi bersebelahan tidak pernah bernada mirip.
+   */
+  var PALET_SISI = [
+    '#ffe0b2', '#c5e1f5', '#c8e6c9', '#f8bbd0', '#d1c4e9', '#fff59d',
+    '#b2dfdb', '#ffccbc', '#cfd8dc', '#e6ee9c', '#d7ccc8', '#f0b7cd'
+  ];
+
+  /** Peta sisi -> warna untuk sebuah bangun. */
+  function paletSisi(jumlah) {
+    var out = {};
+    for (var i = 0; i < jumlah; i++) out[i] = PALET_SISI[i % PALET_SISI.length];
+    return out;
+  }
+
   /** Bulatan bernomor: putih berbingkai supaya terbaca di atas corak apa pun. */
   function labelNomor(x, y, teksNomor, r) {
     r = r || 11;
@@ -531,6 +553,7 @@
   return {
     oblique: oblique, ortho: ortho, yawPitch: yawPitch, projectionFor: projectionFor,
     solid: solid, solidView: solidView, solidSpin: solidSpin,
-    net: net, gridCell: gridCell, shapes: shapes, doc: doc, text: text, num: num
+    net: net, gridCell: gridCell, shapes: shapes, doc: doc, text: text, num: num,
+    paletSisi: paletSisi
   };
 });
