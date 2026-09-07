@@ -869,8 +869,22 @@
     if (!def) throw new Error('bangun ruang tidak dikenal: ' + id);
     var q = {};
     Object.keys(def.params || {}).forEach(function (k) { q[k] = (params && params[k]) || def.params[k]; });
-    var raw = def.build(q);
+    return susunSolid(def.build(q), {
+      id: id, name: def.name, short: def.short || def.name,
+      polos: !!def.polos, pita: !!def.pita,
+      params: q, paramInfo: def.paramInfo || null,
+      pose: def.pose, projection: def.projection
+    });
+  }
 
+  /**
+   * Lengkapi bangun mentah ({verts, faces}) menjadi bangun siap pakai: orientasi
+   * sisi diseragamkan, kotak gambar dihitung, pose dipilih, lalu rusuk, grup
+   * simetri, dan daftar sisi yang tampak. Dipisahkan dari build() supaya bangun
+   * yang TIDAK berasal dari katalog — mis. turunan sebuah bentuk untuk dijadikan
+   * pengecoh — melewati jalur penyiapan yang sama persis.
+   */
+  function susunSolid(raw, meta) {
     var c = centroid(raw.verts);
     var verts = raw.verts.map(function (v) { return sub(v, c); });
 
@@ -891,11 +905,11 @@
     });
 
     var solid = {
-      id: id, name: def.name, short: def.short || def.name, verts: verts, faces: faces,
-      polos: !!def.polos,                // bangun yang memang dipakai tanpa gambar sisi
-      pita: !!def.pita,
-      params: q, paramInfo: def.paramInfo || null,
-      pose: def.pose, projection: def.projection
+      id: meta.id, name: meta.name, short: meta.short, verts: verts, faces: faces,
+      polos: !!meta.polos,               // bangun yang memang dipakai tanpa gambar sisi
+      pita: !!meta.pita,
+      params: meta.params || {}, paramInfo: meta.paramInfo || null,
+      pose: meta.pose, projection: meta.projection
     };
     if (solid.pose === 'auto') solid.pose = choosePose(solid);
     solid.edges = buildEdges(solid);
@@ -908,6 +922,133 @@
     solid.viewVec = solid.projection === 'oblique' ? [0.38, 0.38, 1] : [0, 0, 1];
     solid.visible = visibleFaces(solid, poseMatrix(solid), solid.viewVec);
     return solid;
+  }
+
+  /** Nisbah sisi kotak pembatas, terurut — sidik proporsi sebuah bangun. */
+  function proporsi(verts, u, w, sumbu) {
+    var lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    verts.forEach(function (v) {
+      var k = [dot(v, u), dot(v, w), dot(v, sumbu)];
+      for (var i = 0; i < 3; i++) {
+        if (k[i] < lo[i]) lo[i] = k[i];
+        if (k[i] > hi[i]) hi[i] = k[i];
+      }
+    });
+    var d = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]].sort(function (x, y) { return x - y; });
+    return [d[0] / d[2], d[1] / d[2]];
+  }
+
+  /**
+   * Bentuk-bentuk TURUNAN sebuah bangun: proporsinya diubah, jenisnya tidak.
+   *
+   * Inilah yang membuat pilihan jawaban masuk akal. Pengecoh yang diambil dari
+   * bangun lain di kolam bisa berjumlah sisi sama tetapi berjenis tutup berbeda —
+   * segidelapan beraturan lawan blok bertakik — sehingga penjawab mencoretnya
+   * dari bentuk tutupnya saja, tanpa membayangkan lipatan sama sekali. Turunan
+   * berpola sama persis dengan kuncinya; yang berbeda hanya panjang sisi tegak
+   * atau proporsi tutupnya.
+   *
+   * Caranya penskalaan AFIN pada rangka tutup bangunnya (dua arah dalam bidang
+   * tutup, satu arah sepanjang sumbu prisma). Peta afin membawa bidang ke bidang,
+   * jadi seluruh sisi tetap datar dan jumlahnya tidak berubah; prisma tegak tetap
+   * tegak, limas terpancung tetap menirus, dan yang beratap miring tetap miring.
+   * Penskalaan seragam sengaja tidak dipakai — hasilnya sebangun dengan kuncinya
+   * dan setelah digambar sesuai kotaknya akan tampak persis sama.
+   *
+   * Perubahannya ditahan di dua sisi: cukup besar supaya bedanya terlihat ketika
+   * kedua gambar dibandingkan (nisbah kotak pembatas berbeda >= 12%), dan cukup
+   * kecil supaya sekilas keduanya tetap sekeluarga.
+   *
+   * Kesalahannya terjamin tanpa perlu mencoba melipat: shapeKey yang berbeda
+   * berarti kumpulan (jumlah rusuk, luas) sisinya berbeda, sedangkan hasil lipatan
+   * sebuah jaring selalu bersisi sama persis dengan jaringnya.
+   */
+  function variasiBentuk(solid, jumlah, benih) {
+    // Rangka acuan: tutup prisma kalau ada, kalau tidak sisi terbesar. Limas tidak
+    // punya struktur prisma, tetapi alasnya sisi terbesar — jadi penskalaan sepanjang
+    // sumbu tetap berarti "meninggi/memendek" dan yang di bidang alas "melebar/menyempit".
+    var st = strukturPrisma(solid);
+    var acuan;
+    if (st) acuan = solid.faces[st.tutup[0]];
+    else {
+      acuan = solid.faces[0];
+      solid.faces.forEach(function (f) { if (f.area > acuan.area) acuan = f; });
+    }
+    var sumbu = unit(acuan.normal);
+    var u = unit(acuan.right);
+    var w = unit(cross(sumbu, u));
+    var asal = shapeKey(solid);
+    var proporsiAsal = proporsi(solid.verts, u, w, sumbu);
+    var rnd = mulberry32((benih | 0) || 20260907);
+
+    var resep = [];
+    [0.72, 1.38, 0.80, 1.26].forEach(function (k) {
+      resep.push([1, 1, k]);          // tinggi sisi tegak
+      resep.push([k, 1, 1]);          // lebar tutup
+      resep.push([1, k, 1]);          // dalam tutup
+    });
+    [[1.24, 0.84, 1], [0.84, 1.24, 1], [1.2, 1, 0.82], [0.84, 1, 1.22]].forEach(function (k) {
+      resep.push(k);
+    });
+
+    var out = [], sudah = {};
+    sudah[asal] = true;
+    resep = acakDaftar(resep, rnd);
+
+    for (var i = 0; i < resep.length && out.length < jumlah; i++) {
+      var sk = resep[i];
+      var verts = solid.verts.map(function (v) {
+        return add(add(mul(u, dot(v, u) * sk[0]), mul(w, dot(v, w) * sk[1])),
+          mul(sumbu, dot(v, sumbu) * sk[2]));
+      });
+      // ukuran keseluruhan disamakan dengan aslinya supaya yang berbeda benar-benar
+      // proporsinya, bukan sekadar besar-kecilnya
+      var norm = ukuranTerbesar(solid.verts) / ukuranTerbesar(verts);
+      verts = verts.map(function (v) { return mul(v, norm); });
+
+      var pr = proporsi(verts, u, w, sumbu);
+      var beda = Math.max(Math.abs(pr[0] - proporsiAsal[0]) / Math.max(pr[0], proporsiAsal[0]),
+        Math.abs(pr[1] - proporsiAsal[1]) / Math.max(pr[1], proporsiAsal[1]));
+      // Ambang bawah 20%: di bawah itu kedua jaring nyaris kembar dan soalnya
+      // berubah jadi adu ketelitian mengukur, bukan adu membayangkan lipatan.
+      if (beda < 0.20) continue;
+
+      var mentah = { verts: verts, faces: solid.faces.map(function (f) {
+        return { v: f.v.slice(), name: f.name };
+      }) };
+      if (!terbaca(mentah)) continue;
+
+      var turunan = susunSolid(mentah, {
+        id: 'acak', name: 'Bangun tak beraturan', short: 'Tak beraturan',
+        polos: true, pita: true, params: { benih: (benih | 0) + i + 1 },
+        pose: 'auto', projection: 'ortho'
+      });
+      var k2 = shapeKey(turunan);
+      if (sudah[k2]) continue;                         // kembar dengan kunci atau sesama pengecoh
+      sudah[k2] = true;
+      out.push(turunan);
+    }
+    return out;
+  }
+
+  function ukuranTerbesar(verts) {
+    var lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    verts.forEach(function (v) {
+      for (var i = 0; i < 3; i++) {
+        if (v[i] < lo[i]) lo[i] = v[i];
+        if (v[i] > hi[i]) hi[i] = v[i];
+      }
+    });
+    return Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+  }
+
+  function acakDaftar(arr, rnd) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(rnd() * (i + 1)), t = a[i];
+      a[i] = a[j]; a[j] = t;
+    }
+    return a;
   }
 
   // ---------------------------------------------------------------- ketetanggaan
@@ -1960,6 +2101,7 @@
     symmetries: symmetries, isSpanningTree: isSpanningTree, treeKey: treeKey,
     polyOverlap: polyOverlap, unfold: unfold, netLurus: netLurus, pertemuanT: pertemuanT,
     irregularSolid: irregularSolid, mulberry32: mulberry32, strukturPrisma: strukturPrisma,
+    variasiBentuk: variasiBentuk, susunSolid: susunSolid,
     poliamond: poliamond, templatePenampang: templatePenampang, ukurKeterbacaan: ukurKeterbacaan,
     frustumSolid: frustumSolid, atapMiring: atapMiring, ekstrusi: ekstrusi,
     poligonSederhana: poligonSederhana, signedVolume: signedVolume,

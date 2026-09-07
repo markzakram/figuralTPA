@@ -125,9 +125,10 @@
           ', sedangkan bangun ruang pada soal tersusun dari ' + a.susunanBenar +
           '. Susunan sisi yang berbeda tidak mungkin menghasilkan bangun yang sama.';
       }
+      var beda = a.beda ? ': ' + a.beda : '';
       return 'Pada ' + huruf + ', jumlah dan jenis sisinya memang sama (' + a.susunan +
-        '), tetapi ukuran sisi-sisinya tidak sama dengan bangun ruang pada soal. ' +
-        'Sisi yang ukurannya berbeda tidak akan bertemu rapat ketika dilipat.';
+        '), tetapi proporsinya berbeda' + beda + '. Sisi yang ukurannya tidak sama tidak akan ' +
+        'bertemu rapat ketika dilipat, jadi jaring ini tidak dapat membentuk bangun pada soal.';
     }
     return opt.reason || '';
   }
@@ -255,6 +256,84 @@
       out.push(akhir + '.');
     }
     return out;
+  }
+
+  /**
+   * Apa yang membedakan dua bangun yang susunan sisinya sama?
+   *
+   * Sejak pengecoh diturunkan dari bentuk kuncinya, keduanya hampir selalu
+   * bersusunan sisi sama persis — "susunannya berbeda" tidak lagi benar, dan
+   * "ukurannya berbeda" terlalu samar untuk ditelusuri. Yang dibandingkan di sini
+   * proporsinya: tinggi pita sisi tegak terhadap lebar tutupnya, lalu bentuk
+   * tutupnya sendiri. Semuanya diukur dari geometri, bukan dari cara pengecohnya
+   * dibuat, jadi tetap sahih untuk pengecoh yang berasal dari kolam bentuk lain.
+   *
+   * @returns {string|null} keterangan singkat, atau null kalau tidak ada yang menonjol
+   */
+  /** Nisbah kotak pembatas terurut — dipakai kalau bangunnya bukan prisma. */
+  function nisbahKotak(sd) {
+    var lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    sd.verts.forEach(function (v) {
+      for (var i = 0; i < 3; i++) {
+        if (v[i] < lo[i]) lo[i] = v[i];
+        if (v[i] > hi[i]) hi[i] = v[i];
+      }
+    });
+    var d = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]].sort(function (x, y) { return x - y; });
+    return d[0] / d[2];
+  }
+
+  function bedaProporsi(kunci, lain) {
+    var a = S.strukturPrisma(kunci), b = S.strukturPrisma(lain);
+    if (!a || !b) {
+      // limas dan kawan-kawannya: yang bisa dibandingkan hanya kerampingannya
+      var na = nisbahKotak(kunci), nb = nisbahKotak(lain);
+      var d = (nb - na) / Math.max(na, nb);
+      if (Math.abs(d) < 0.12) return null;
+      return d > 0 ? 'bentuknya lebih gempal — tinggi dan lebarnya lebih berimbang'
+        : 'bentuknya lebih ramping — selisih tinggi dan lebarnya lebih besar';
+    }
+
+    function ukur(sd, st) {
+      var t1 = sd.faces[st.tutup[0]], t2 = sd.faces[st.tutup[1]];
+      var tinggi = Math.abs(S.dot(S.sub(t2.center, t1.center), t1.normal));
+      var lebar = Math.sqrt(Math.max(t1.area, t2.area));
+      // sisi terpanjang : terpendek pada tutupnya = pipih atau tidaknya tutup itu
+      var p = S.facePoly2D(t1), mn = Infinity, mx = 0;
+      for (var i = 0; i < p.length; i++) {
+        var q = p[(i + 1) % p.length];
+        var L = Math.hypot(q[0] - p[i][0], q[1] - p[i][1]);
+        mn = Math.min(mn, L); mx = Math.max(mx, L);
+      }
+      // kotak pembatas tutup: memanjang ke satu arah atau tidak
+      var xs = p.map(function (q2) { return q2[0]; }), ys = p.map(function (q2) { return q2[1]; });
+      var lb = Math.max.apply(null, xs) - Math.min.apply(null, xs);
+      var dl = Math.max.apply(null, ys) - Math.min.apply(null, ys);
+      return {
+        ramping: tinggi / lebar,
+        pipih: mx / Math.max(mn, 1e-9),
+        lonjong: Math.max(lb, dl) / Math.max(Math.min(lb, dl), 1e-9)
+      };
+    }
+
+    var A = ukur(kunci, a), B = ukur(lain, b);
+    var dRamping = (B.ramping - A.ramping) / Math.max(A.ramping, B.ramping);
+    var dPipih = (B.pipih - A.pipih) / Math.max(A.pipih, B.pipih);
+
+    if (Math.abs(dRamping) >= 0.12 && Math.abs(dRamping) >= Math.abs(dPipih)) {
+      return dRamping > 0 ? 'sisi tegaknya lebih tinggi dibanding lebar tutupnya'
+        : 'sisi tegaknya lebih pendek dibanding lebar tutupnya';
+    }
+    if (Math.abs(dPipih) >= 0.12) {
+      return dPipih > 0 ? 'tutupnya lebih pipih — ada rusuk yang jauh lebih panjang daripada yang lain'
+        : 'tutupnya lebih rata — rusuknya lebih seragam panjangnya';
+    }
+    var dLonjong = (B.lonjong - A.lonjong) / Math.max(A.lonjong, B.lonjong);
+    if (Math.abs(dLonjong) >= 0.10) {
+      return dLonjong > 0 ? 'tutupnya memanjang ke satu arah, tidak sebulat tutup pada soal'
+        : 'tutupnya lebih membulat, tidak memanjang seperti tutup pada soal';
+    }
+    return null;
   }
 
   /** Tanda tangan visual: gambar apa yang tampak pada tiap sisi yang terlihat. */
@@ -548,6 +627,24 @@
    * sama persis dengan jaring itu. Maka jaring milik bangun yang kumpulan sisinya
    * berbeda MUSTAHIL terlipat menjadi bangun pada soal — tanpa perlu mencoba.
    */
+  /**
+   * Pengecoh untuk bangun polos, diturunkan dari bentuk KUNCINYA sendiri.
+   *
+   * Mengambil pengecoh dari bangun lain di kolam membuat soalnya bocor: pada soal
+   * prisma segidelapan, pengecoh berjumlah sisi sama pun tutupnya bisa berupa blok
+   * bertakik, sehingga penjawab mencoretnya dari bentuk tutupnya saja. Turunan
+   * berpola sama persis — tutup sejenis, pita sisi tegak sejenis — dan hanya
+   * berbeda proporsi, jadi harus benar-benar dicocokkan.
+   *
+   * Kalau turunannya kurang (bangun yang bukan prisma tidak punya), kolam bentuk
+   * lain tetap dipakai sebagai cadangan.
+   */
+  function pengecohTurunan(solid, jumlah, rnd) {
+    var benih = Math.floor((rnd || Math.random)() * 1e6) + 1;
+    return S.variasiBentuk(solid, jumlah, benih)
+      .map(function (t) { return { solid: t, nets: S.nets(t, 8) }; })
+      .filter(function (t) { return t.nets.length; });
+  }
   function netChoicePolos(solid, nets, pool, opts) {
     opts = opts || {};
     var rnd = opts.rnd || Math.random;
@@ -567,6 +664,10 @@
     // Ambil dari sekumpulan bentuk PALING MIRIP, lalu diacak. Kalau pengecohnya
     // jauh berbeda (mis. limas untuk soal prisma) penjawab bisa mencoretnya tanpa
     // berpikir; yang mirip memaksa mencocokkan penampang dan menghitung sisi.
+
+    // Turunan bentuk kunci lebih dulu; kolam bentuk lain hanya cadangan.
+    var turunan = pengecohTurunan(solid, count + 2, rnd);
+    kandidat = turunan.length >= count - 1 ? turunan : turunan.concat(kandidat);
 
     // Jaring yang melengkung hanya dipasangkan dengan jaring yang melengkung.
     // Bangun kotak berpengecoh jaring kipas langsung ketahuan tanpa perlu
@@ -590,7 +691,8 @@
         kind: 'net', net: pilihJaring(k.nets, rnd),
         faces: k.solid.faces.map(function () { return { art: null, rot: 0 }; }),
         solidNet: k.solid, correct: false, key: k.solid.id + ':' + i,
-        alasan: { jenis: 'bentuk', susunan: S.compositionText(k.solid), susunanBenar: S.compositionText(solid) }
+        alasan: { jenis: 'bentuk', susunan: S.compositionText(k.solid),
+          susunanBenar: S.compositionText(solid), beda: bedaProporsi(solid, k.solid) }
       });
     }
 
@@ -705,6 +807,13 @@
       sudah[k] = true;
       return true;
     });
+    // Sama seperti tipe B polos: pengecoh diturunkan dari bentuk kuncinya supaya
+    // berpola sama dan hanya berbeda proporsi.
+    var benihC = Math.floor(rnd() * 1e6) + 1;
+    var turunanC = S.variasiBentuk(target, count + 2, benihC);
+    if (turunanC.length >= count - 1) kandidat = turunanC;
+    else kandidat = turunanC.concat(kandidat);
+
     // Jaring pada soal memperlihatkan apakah bangunnya menirus (pitanya membuka
     // seperti kipas) atau tegak (pitanya lurus). Pengecoh dari kelas yang lain
     // langsung tercoret tanpa perlu membayangkan lipatannya, jadi hanya bangun
@@ -722,7 +831,8 @@
         kind: 'shape', solid: pool[i], correct: false,
         // Menyebut namanya saja tidak menolong ketika kunci dan pengecoh
         // sama-sama "bangun tak beraturan" — yang membedakan susunan sisinya.
-        alasan: { jenis: 'bentuk', susunan: S.compositionText(pool[i]), susunanBenar: S.compositionText(target) }
+        alasan: { jenis: 'bentuk', susunan: S.compositionText(pool[i]),
+          susunanBenar: S.compositionText(target), beda: bedaProporsi(target, pool[i]) }
       });
     }
     if (items.length < count) {

@@ -183,6 +183,40 @@ menutupi. Pencacahan jaring-jaring beralih ke **pengambilan pohon rentang acak**
 (berbenih tetap, jadi tetap dapat diulang) ketika ruang kombinasinya melewati 2×10⁵ —
 tanpa itu satu bentuk bersisi 11 butuh 2,6 detik; sekarang 18 milidetik.
 
+### Pengecoh diturunkan dari bentuk kuncinya
+
+Mengambil pengecoh dari bangun lain di kolam membuat soal bocor. Pada soal prisma
+bertutup segidelapan, pengecoh berjumlah sisi sama pun tutupnya bisa berupa blok
+bertakik — penjawab mencoretnya dari bentuk tutupnya saja, tanpa membayangkan
+lipatan sama sekali.
+
+Karena itu pengecoh kini **diturunkan dari bentuk kuncinya sendiri**: proporsinya
+diubah, jenisnya tidak. Caranya penskalaan **afin** pada rangka tutup bangunnya —
+dua arah dalam bidang tutup, satu arah sepanjang sumbu prisma. Peta afin membawa
+bidang ke bidang, jadi semua sisi tetap datar dan jumlahnya tidak berubah; prisma
+tegak tetap tegak, limas terpancung tetap menirus, yang beratap miring tetap miring.
+Penskalaan seragam sengaja tidak dipakai — hasilnya sebangun dengan kuncinya dan
+setelah digambar sesuai kotaknya akan tampak persis sama.
+
+| | sebelum | sesudah |
+|---|---|---|
+| pengecoh berjumlah sisi sama dengan kunci | sebagian | **100%** |
+| pengecoh bersusunan sisi sama persis | jarang | **91%** |
+
+Bedanya ditahan di **dua sisi**. Batas bawah 20% (nisbah kotak pembatas): di bawah
+itu kedua jaring nyaris kembar dan soalnya berubah jadi adu ketelitian mengukur,
+bukan adu membayangkan lipatan. Batas atasnya datang dari resep penskalaannya
+sendiri — sebarannya berhenti di sekitar 31%, jadi sekilas semuanya tetap
+sekeluarga. Bangun yang bukan prisma tidak punya turunan; di situ kolam bentuk lain
+tetap dipakai sebagai cadangan.
+
+Karena susunan sisinya kini hampir selalu sama, pembahasan pengecoh tidak lagi bisa
+menyebut "susunannya berbeda". Yang dibandingkan sekarang proporsinya — tinggi pita
+sisi tegak terhadap lebar tutup, keseragaman rusuk tutup, dan kelonjongan tutupnya —
+diukur dari geometri, bukan dari cara pengecohnya dibuat. **99%** pengecoh menyebut
+satu beda yang konkret, misalnya "sisi tegaknya lebih pendek dibanding lebar
+tutupnya".
+
 **Pengecoh untuk bangun polos** tidak bisa dibuat dengan menukar gambar. Karena itu
 tipe B mengambil jaring-jaring milik bangun lain yang **susunan sisinya berbeda**.
 Jaminannya bersifat pasti tanpa perlu mencoba melipat: hasil lipatan sebuah
