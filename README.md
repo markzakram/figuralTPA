@@ -183,6 +183,33 @@ menutupi. Pencacahan jaring-jaring beralih ke **pengambilan pohon rentang acak**
 (berbenih tetap, jadi tetap dapat diulang) ketika ruang kombinasinya melewati 2×10⁵ —
 tanpa itu satu bentuk bersisi 11 butuh 2,6 detik; sekarang 18 milidetik.
 
+### Dua arah soal butuh pengecoh yang berbeda sifatnya
+
+Arah soal menentukan apa yang boleh dijadikan pembeda, dan keduanya berlawanan:
+
+| | tipe B: bangun ruang → jaring-jaring | tipe C: jaring-jaring → bentuk bangun |
+|---|---|---|
+| yang ditunjukkan soal | bangun ruangnya | jaring-jaringnya |
+| pilihan berupa | jaring, digambar besar dan mendatar | bangun ruang kecil |
+| pengecoh berjumlah sisi lain | **membocorkan** — tutup bangun soal terlihat langsung, penjawab mencoret tanpa membayangkan lipatan | **tidak membocorkan** — jumlah sisi hanya diketahui dengan menghitung petak jaring, dan itu keterampilan yang diuji |
+| pengecoh beda proporsi saja | terbaca, karena jaringnya besar dan mendatar | **tidak terbaca** — tiap gambar diskalakan ke kotaknya sendiri sehingga selisih ukuran lenyap |
+| karena itu dipakai | turunan afin dari bentuk kunci, beda proporsi ≥ 20% | bentuk lain dari kolam, dibedakan jumlah sisi atau bentuk tutupnya |
+
+Kekeliruan yang sempat terjadi: turunan afin diterapkan ke kedua arah. Pada tipe C
+hasilnya lima prisma yang hanya berbeda tinggi — praktis tidak terbedakan. Sekarang
+tipe C menyaring pengecoh dengan **sidik tampak** = jumlah sisi + bentuk tutupnya
+(panjang rusuk tutup dinormalkan ke keliling lalu dibulatkan kasar, jadi bebas
+ukuran: dua tutup sebangun bersidik sama, segienam siku dan segienam zigzag tidak).
+Paling banyak dua pengecoh boleh berjumlah sisi sama dengan kunci, supaya menghitung
+petak jaring saja belum cukup untuk menjawab.
+
+Pengisiannya bertahap: syarat ketat dulu, dilonggarkan hanya kalau pilihan belum
+genap lima — satu pengecoh yang agak mirip lebih baik daripada soal berpilihan
+empat. Diukur pada kolam bentuk yang benar-benar dipakai aplikasi (89 bentuk, 712
+soal): **0** soal berpilihan kurang dari lima dan **0** soal yang punya dua pilihan
+bersidik tampak sama. Pada kolam uji yang sengaja kecil (49 bentuk) pelonggaran
+memang terpakai: 14,3% soal punya satu pasangan mirip, tetapi tetap lima pilihan.
+
 ### Pengecoh diturunkan dari bentuk kuncinya
 
 Mengambil pengecoh dari bangun lain di kolam membuat soal bocor. Pada soal prisma

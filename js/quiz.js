@@ -829,12 +829,18 @@
       sudah[k] = true;
       return true;
     });
-    // Sama seperti tipe B polos: pengecoh diturunkan dari bentuk kuncinya supaya
-    // berpola sama dan hanya berbeda proporsi.
-    var benihC = Math.floor(rnd() * 1e6) + 1;
-    var turunanC = S.variasiBentuk(target, count + 2, benihC);
-    if (turunanC.length >= count - 1) kandidat = turunanC;
-    else kandidat = turunanC.concat(kandidat);
+    // TIPE C TIDAK memakai turunan proporsi seperti tipe B.
+    //
+    // Pada tipe B soal menunjukkan bangun ruangnya dan pilihannya berupa jaring:
+    // jaring digambar besar dan mendatar, jadi selisih proporsi 20% masih terbaca,
+    // sedangkan pengecoh bertutup lain jenis membuat soalnya bocor.
+    //
+    // Di sini kebalikannya. Soal menunjukkan JARING, pilihannya bangun ruang kecil,
+    // dan tiap gambar diskalakan ke kotaknya sendiri sehingga selisih ukuran lenyap
+    // sama sekali — lima prisma yang hanya berbeda proporsi tampak kembar. Lagi pula
+    // pengecoh berjumlah sisi lain TIDAK membocorkan jawaban di sini: jumlah sisi
+    // bangunnya hanya bisa diketahui dengan menghitung petak pada jaring soal, dan
+    // itu justru keterampilan yang diuji.
 
     // Jaring pada soal memperlihatkan apakah bangunnya menirus (pitanya membuka
     // seperti kipas) atau tegak (pitanya lurus). Pengecoh dari kelas yang lain
@@ -845,18 +851,72 @@
     if (sekelas.length >= count - 1) kandidat = sekelas;
 
     // pengecoh diambil dari bentuk yang paling menyerupai kunci
-    var pool = shuffle(S.urutMirip(target, kandidat).slice(0, Math.max(count * 2, 8)), rnd);
+    // Diambil lebih banyak calon daripada tipe lain: penyaring "tampak kembar"
+    // di bawah menolak cukup banyak, dan kalau calonnya habis syaratnya terpaksa
+    // dilonggarkan — yang justru memunculkan pilihan kembar yang mau dihindari.
+    var pool = shuffle(S.urutMirip(target, kandidat).slice(0, Math.max(count * 6, 24)), rnd);
+
+    /**
+     * Sidik "seperti apa gambarnya": jumlah sisi + bentuk tutupnya.
+     *
+     * Yang membuat dua pilihan tampak kembar adalah tutup yang sama bentuknya —
+     * sisanya tinggal beda tinggi, dan tinggi lenyap karena tiap gambar diskalakan
+     * ke kotaknya sendiri. Bentuk tutup disidik dari panjang rusuknya yang
+     * dinormalkan ke keliling lalu dibulatkan kasar, jadi bebas ukuran: dua tutup
+     * sebangun bersidik sama, tutup segienam siku dan segienam zigzag tidak.
+     */
+    function sidikTampak(sd) {
+      var st = S.strukturPrisma(sd), muka;
+      if (st) muka = sd.faces[st.tutup[0]];
+      else {
+        muka = sd.faces[0];
+        sd.faces.forEach(function (f) { if (f.area > muka.area) muka = f; });
+      }
+      var p = S.facePoly2D(muka), keliling = 0, L = [];
+      for (var i = 0; i < p.length; i++) {
+        var q = p[(i + 1) % p.length];
+        var d = Math.hypot(q[0] - p[i][0], q[1] - p[i][1]);
+        L.push(d); keliling += d;
+      }
+      L = L.map(function (d) { return Math.round(d / keliling * 20); })
+        .sort(function (x, y) { return x - y; });
+      return sd.faces.length + '|' + p.length + '|' + L.join(',');
+    }
 
     var items = [{ kind: 'shape', solid: target, correct: true, reason: '' }];
-    for (var i = 0; i < pool.length && items.length < count; i++) {
-      items.push({
-        kind: 'shape', solid: pool[i], correct: false,
-        // Menyebut namanya saja tidak menolong ketika kunci dan pengecoh
-        // sama-sama "bangun tak beraturan" — yang membedakan susunan sisinya.
-        alasan: { jenis: 'bentuk', susunan: S.compositionText(pool[i]),
-          susunanBenar: S.compositionText(target), beda: bedaProporsi(target, pool[i]) }
-      });
+    var tampak = {};
+    tampak[sidikTampak(target)] = 1;
+    var sisiKunci = target.faces.length;
+
+    /**
+     * Isi pilihan bertahap. Tahap ketat menolak pengecoh yang tampak kembar dan
+     * membatasi berapa yang boleh berjumlah sisi sama dengan kunci; kalau kolam
+     * bentuknya kecil dan pilihan belum genap, syaratnya dilonggarkan setahap.
+     * Lebih baik satu pengecoh yang agak mirip daripada soal berpilihan empat.
+     */
+    function isi(tolakKembar, batasSamaSisi) {
+      var samaSisi = 0;
+      for (var i = 0; i < pool.length && items.length < count; i++) {
+        var sid = sidikTampak(pool[i]);
+        if (tolakKembar && tampak[sid]) continue;
+        var sama = pool[i].faces.length === sisiKunci;
+        if (sama && ++samaSisi > batasSamaSisi) continue;
+        if (items.some(function (it) { return it.solid === pool[i]; })) continue;
+        tampak[sid] = 1;
+        items.push({
+          kind: 'shape', solid: pool[i], correct: false,
+          // Menyebut namanya saja tidak menolong ketika kunci dan pengecoh
+          // sama-sama "bangun tak beraturan" — yang membedakan susunan sisinya.
+          alasan: { jenis: 'bentuk', susunan: S.compositionText(pool[i]),
+            susunanBenar: S.compositionText(target), beda: bedaProporsi(target, pool[i]) }
+        });
+      }
     }
+
+    isi(true, 2);
+    if (items.length < count) isi(true, count);
+    if (items.length < count) isi(false, count);
+
     if (items.length < count) {
       warnings.push('Hanya tersedia ' + (items.length - 1) + ' bangun pembanding yang berbeda bentuk.');
     }
