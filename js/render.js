@@ -145,7 +145,8 @@
       tampak.forEach(function (item, k) {
         var no = opts.nomor[item.f.index];
         if (!no) return;
-        var t = titikNomor(segi[k], rintangan, rr);
+        var f2 = faces && faces[item.f.index];
+        var t = titikNomor(segi[k], rintangan, rr, !f2 || Art.isBlank(f2.art));
         t.no = no;
         titik.push(t);
         rintangan.push(cakramNomor(t, rr));   // nomor berikutnya menghindari yang ini
@@ -279,7 +280,8 @@
       cells.forEach(function (c, ci) {
         var no = opts.nomor[c.face];
         if (!no) return;
-        var t = titikNomor(segi[ci], rintangan, rn);
+        var fc = faces && faces[c.face];
+        var t = titikNomor(segi[ci], rintangan, rn, !fc || Art.isBlank(fc.art));
         t.no = no;
         daftar.push(t);
         rintangan.push(cakramNomor(t, rn));   // nomor berikutnya menghindari yang ini
@@ -356,6 +358,60 @@
     return masuk;
   }
 
+  /** Jarak titik ke tepi poligon, tanpa peduli di dalam atau di luar. */
+  function jarakKeTepi(x, y, poly) {
+    var d = Infinity;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var ax = poly[j][0], ay = poly[j][1];
+      var ex = poly[i][0] - ax, ey = poly[i][1] - ay;
+      var L = ex * ex + ey * ey;
+      var t = L ? ((x - ax) * ex + (y - ay) * ey) / L : 0;
+      t = Math.max(0, Math.min(1, t));
+      d = Math.min(d, Math.hypot(x - (ax + t * ex), y - (ay + t * ey)));
+    }
+    return d;
+  }
+
+  /**
+   * Titik paling "dalam" pada sebuah sisi: titik di dalam poligon yang jaraknya
+   * ke tepi paling jauh. Dicari dengan penyisiran kisi lalu dipertajam, sebab
+   * sisi bangun tak beraturan sering CEKUNG dan titik tengahnya bisa jatuh di
+   * luar sisi itu sendiri.
+   *
+   * @returns {{x:number, y:number, d:number}} d = jarak ke tepi terdekat
+   */
+  function titikDalam(poly) {
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    poly.forEach(function (p) {
+      if (p[0] < x0) x0 = p[0];
+      if (p[0] > x1) x1 = p[0];
+      if (p[1] < y0) y0 = p[1];
+      if (p[1] > y1) y1 = p[1];
+    });
+    var terbaik = { x: (x0 + x1) / 2, y: (y0 + y1) / 2, d: -1 }, i, j;
+    var langkah = Math.max((x1 - x0), (y1 - y0)) / 12;
+    for (i = x0 + langkah / 2; i < x1; i += langkah) {
+      for (j = y0 + langkah / 2; j < y1; j += langkah) {
+        if (!didalam(poly, i, j)) continue;
+        var d = jarakKeTepi(i, j, poly);
+        if (d > terbaik.d) terbaik = { x: i, y: j, d: d };
+      }
+    }
+    // pertajam di sekitar pemenangnya
+    for (var putaran = 0; putaran < 3; putaran++) {
+      langkah /= 2.5;
+      for (i = -2; i <= 2; i++) {
+        for (j = -2; j <= 2; j++) {
+          var x = terbaik.x + i * langkah, y = terbaik.y + j * langkah;
+          if (!didalam(poly, x, y)) continue;
+          var d2 = jarakKeTepi(x, y, poly);
+          if (d2 > terbaik.d) terbaik = { x: x, y: y, d: d2 };
+        }
+      }
+    }
+    return terbaik;
+  }
+
   /** Jarak titik ke poligon; 0 kalau titiknya di dalam. */
   function jarakKePoly(x, y, poly) {
     if (didalam(poly, x, y)) return 0;
@@ -390,7 +446,13 @@
     return out;
   }
 
-  function titikNomor(poly, semua, r) {
+  /**
+   * @param bolehDalam sisi ini polos (tidak bergambar), jadi nomornya boleh
+   *   diletakkan DI DALAM sisi. Aturan "nomor selalu di luar" ada semata untuk
+   *   melindungi corak; pada bangun polos aturan itu justru merugikan — nomor
+   *   menumpuk di tepi gambar dengan garis penunjuk panjang yang saling menyilang.
+   */
+  function titikNomor(poly, semua, r, bolehDalam) {
     var cx = 0, cy = 0, i;
     for (i = 0; i < poly.length; i++) { cx += poly[i][0]; cy += poly[i][1]; }
     cx /= poly.length; cy /= poly.length;
@@ -401,6 +463,11 @@
         if (jarakKePoly(x, y, semua[k]) < r * 0.98) return false;
       }
       return true;
+    }
+
+    if (bolehDalam) {
+      var dalam = titikDalam(poly);
+      if (dalam.d >= r * 1.06) return { x: dalam.x, y: dalam.y, ax: dalam.x, ay: dalam.y };
     }
 
     var terbaik = null, skor = -1;

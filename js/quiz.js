@@ -120,6 +120,11 @@
         'sehingga tidak mungkin muncul di posisi tersebut.';
     }
     if (a.jenis === 'bentuk') {
+      var yangSalah = quiz.type === 'toShape'
+        ? 'bangun ini tidak dapat dibentuk dari jaring-jaring pada soal'
+        : quiz.type === 'toFaces'
+          ? 'susunan ini bukan susunan sisi bangun ruang pada soal'
+          : 'jaring ini tidak dapat membentuk bangun ruang pada soal';
       if (a.susunan !== a.susunanBenar) {
         return 'Pada ' + huruf + ', sisi-sisinya terdiri atas ' + a.susunan +
           ', sedangkan bangun ruang pada soal tersusun dari ' + a.susunanBenar +
@@ -128,7 +133,7 @@
       var beda = a.beda ? ': ' + a.beda : '';
       return 'Pada ' + huruf + ', jumlah dan jenis sisinya memang sama (' + a.susunan +
         '), tetapi proporsinya berbeda' + beda + '. Sisi yang ukurannya tidak sama tidak akan ' +
-        'bertemu rapat ketika dilipat, jadi jaring ini tidak dapat membentuk bangun pada soal.';
+        'bertemu rapat ketika dilipat, jadi ' + yangSalah + '.';
     }
     return opt.reason || '';
   }
@@ -181,8 +186,25 @@
     var opsi = quiz.options[quiz.answerIndex] || {};
 
     if (quiz.type === 'toShape') {
-      out.push('Jaring-jaring pada soal tersusun dari ' + S.compositionText(solid) +
-        '. Bila dilipat, kedua tutupnya saling berhadapan dan sisi-sisi tegaknya menutup keliling, sehingga terbentuk bangun ruang pada ' + huruf + '.');
+      // Arah lipatannya dijelaskan menurut susunan bangunnya, bukan dengan satu
+      // kalimat umum: prisma menutup keliling lewat pitanya, limas mengerucut ke
+      // satu titik puncak. Keduanya dikenali dari geometri, bukan dari namanya.
+      var st2 = S.strukturPrisma(solid);
+      var segitiga = solid.faces.filter(function (f) { return f.sides === 3; }).length;
+      var kalimat = 'Jaring-jaring pada soal tersusun dari ' + S.compositionText(solid) + '.';
+      if (st2) {
+        kalimat += ' Sisi tegaknya yang berjumlah ' + st2.gelang.length + ' berderet dalam satu ' +
+          'pita; bila pita itu dilipat melingkar, kedua tutupnya bertemu di ujung atas dan bawah ' +
+          'sehingga terbentuk bangun ruang pada ' + huruf + '.';
+      } else if (segitiga === solid.faces.length - 1) {
+        kalimat += ' Sisi segitiganya yang berjumlah ' + segitiga + ' dilipat ke atas dari tiap ' +
+          'rusuk alas dan bertemu di satu titik puncak, sehingga terbentuk bangun ruang pada ' +
+          huruf + '.';
+      } else {
+        kalimat += ' Bila seluruh sisinya dilipat pada rusuk bersamanya, sisi-sisi itu menutup ' +
+          'rapat dan membentuk bangun ruang pada ' + huruf + '.';
+      }
+      out.push(kalimat);
       out.push(BANTUAN_WARNA);
       return out;
     }

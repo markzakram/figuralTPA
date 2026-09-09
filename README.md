@@ -319,7 +319,16 @@ dihitung dari geometri bangunnya:
 | Soal | Bukti yang disebut |
 |---|---|
 | bercorak | sisi terlihat mana yang bertemu di satu titik sudut (diperiksa lewat simpul bersama), pasangan mana yang bersebelahan, dan sisi mana yang melipat ke bagian tersembunyi beserta lawan seberangnya |
-| polos | susunan sisinya, jumlah sisi tegak yang berderet dalam satu pita, dan cara kedua tutup bertemu saat pita dilipat melingkar |
+| polos, prisma | susunan sisinya, jumlah sisi tegak yang berderet dalam satu pita, dan cara kedua tutup bertemu saat pita dilipat melingkar |
+| polos, limas | jumlah sisi segitiganya, dan bahwa semuanya dilipat ke atas dari tiap rusuk alas lalu bertemu di satu titik puncak |
+
+Arah lipatan itu dikenali dari geometrinya — ada tidaknya struktur pita, dan berapa
+sisi yang berbentuk segitiga — bukan dari nama bangunnya.
+
+Kalimat penutup alasan pengecoh ikut menyesuaikan jenis pilihannya: tipe B berupa
+jaring ("jaring ini tidak dapat membentuk bangun ruang pada soal"), tipe C berupa
+bangun ruang ("bangun ini tidak dapat dibentuk dari jaring-jaring pada soal"), dan
+tipe D berupa susunan bangun datar.
 
 Klaim "bertemu di satu titik sudut" hanya ditulis kalau memang ada simpul yang
 dimiliki semua sisi itu; kalau tidak, yang ditulis rantai "sisi 1 bersebelahan
@@ -368,9 +377,23 @@ menyusul. Uraiannya lalu menunjuk nomor itu, misalnya:
 > jaring-jaring dilipat, kedua sisi tersebut tidak akan berada pada posisi yang
 > sama dengan bangun ruang pada soal.
 
-Bulatan nomor selalu diletakkan **di luar** sisinya dengan garis penunjuk pendek
-yang berujung di dalam sisi tersebut. Ditaruh di dalam, bulatan sebesar itu pasti
-menutupi corak pada sisi yang kecil — padahal corak itulah yang harus dibaca.
+Pada gambar **bercorak**, bulatan nomor diletakkan **di luar** sisinya dengan garis
+penunjuk pendek yang berujung di dalam sisi tersebut. Ditaruh di dalam, bulatan
+sebesar itu pasti menutupi corak pada sisi yang kecil — padahal corak itulah yang
+harus dibaca.
+
+Pada gambar **polos** aturannya justru dibalik: nomor ditaruh **di dalam** sisinya,
+tanpa garis penunjuk. Tidak ada simbol yang bisa tertutup di sana, sedangkan aturan
+"selalu di luar" merugikan — pada jaring bersisi sebelas, nomornya terlempar ke tepi
+gambar dan menumpuk di satu pojok dengan garis penunjuk yang saling menyilang. Titik
+dalamnya dicari sebagai titik terjauh dari tepi (penyisiran kisi lalu dipertajam),
+sebab sisi bangun tak beraturan sering cekung dan titik tengahnya bisa jatuh di luar
+sisi itu sendiri. Kalau sisinya terlalu sempit — misalnya sisi tegak yang terlihat
+menyerong pada gambar 3D — nomornya kembali ke luar.
+
+Diperiksa pada 2.748 bulatan gambar polos: 0 yang menyeberang ke petak lain, 0 yang
+bertumpuk, dan 1 yang keluar dari petaknya padahal muat (selisih pencuplikan di
+ambang, bukan salah letak).
 Penempatnya menguji jarak bulatan ke setiap sisi, jadi tidak ada nomor yang
 menimpa gambar atau menimpa nomor lain: nomor ditempatkan berurutan, dan setiap
 bulatan yang sudah terpasang ikut menjadi rintangan bagi nomor berikutnya — tanpa
